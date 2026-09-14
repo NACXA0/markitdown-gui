@@ -1,0 +1,22 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.uv/
+uv.lock.bak
+
+# Build
+build/
+dist/
+*.spec
+bin/pandoc
+
+# IDE / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+
+# App runtime
+*.log
