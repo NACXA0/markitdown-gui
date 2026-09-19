@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Package the Flutter/Flet Linux release bundle as an x86_64 AppImage.
-# Prefers an existing build (with flet-dropzone). Does not re-run network-heavy
-# `flet build` unless --rebuild is passed.
+# 把 Flutter/Flet Linux 发布包打包成 x86_64 AppImage。
+# 优先使用已有构建（含 flet-dropzone）。除非传入 --rebuild，否则不会重新执行依赖网络的 `flet build`。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -12,7 +11,7 @@ if [[ "${1:-}" == "--rebuild" ]]; then
   REBUILD=1
 fi
 
-# Prefer Flet 1.0 `flet build linux` output; fall back to Flutter bundle path.
+# 优先使用 Flet 1.0 `flet build linux` 输出；否则回退到 Flutter bundle 路径。
 BUNDLE="$ROOT/build/linux"
 FLUTTER_BUNDLE="$ROOT/build/flutter/build/linux/x64/release/bundle"
 OUT_DIR="$ROOT/dist/appimage"
@@ -82,7 +81,7 @@ echo "==> Assembling AppDir..."
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications" "$APPDIR/usr/share/icons/hicolor/256x256/apps"
 cp -a "$BUNDLE/." "$APPDIR/usr/bin/"
-# share/ must live at AppDir usr/share, not inside usr/bin
+# share/ 必须放在 AppDir 的 usr/share 下，而不是 usr/bin 内部
 if [[ -d "$APPDIR/usr/bin/share" ]]; then
   cp -a "$APPDIR/usr/bin/share/." "$APPDIR/usr/share/"
   rm -rf "$APPDIR/usr/bin/share"
@@ -96,8 +95,8 @@ exec "$HERE/usr/bin/markitdown-gui" "$@"
 EOF
 chmod +x "$APPDIR/AppRun"
 
-# AppImage root .desktop must use a simple Icon= basename that matches a
-# sibling .png (appimagetool rejects reverse-DNS icon names without that file).
+# AppImage 根目录的 .desktop 必须使用简单的 Icon= 基本名，且同目录要有对应的 .png
+#（appimagetool 遇到没有该文件的反向 DNS 图标名会拒绝）。
 cat > "$APPDIR/markitdown-gui.desktop" << 'EOF'
 [Desktop Entry]
 Name=MarkItDown GUI
@@ -130,7 +129,7 @@ if [[ -n "$ICON_SRC" ]]; then
   cp -f "$ICON_SRC" "$APPDIR/usr/share/icons/hicolor/256x256/apps/markitdown-gui.png"
   ln -sfn "markitdown-gui.png" "$APPDIR/.DirIcon"
 else
-  # Minimal valid 1x1 PNG so appimagetool accepts the AppDir.
+  # 最小合法 1x1 PNG，让 appimagetool 接受该 AppDir。
   printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' \
     > "$APPDIR/markitdown-gui.png"
   ln -sfn "markitdown-gui.png" "$APPDIR/.DirIcon"

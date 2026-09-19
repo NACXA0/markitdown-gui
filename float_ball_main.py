@@ -1,4 +1,7 @@
-from __future__ import annotations
+"""置顶无边框悬浮球窗口入口。
+
+点击圆球选择文件并转换导出，不打开完整主界面。
+"""
 
 import sys
 from pathlib import Path
@@ -12,6 +15,10 @@ from app.theme import apply_theme
 
 
 def main(page: ft.Page) -> None:
+    """构建透明置顶小窗并绑定点击转换流程。
+    :param page: Flet 页面
+    :return: None
+    """
     settings = load_settings()
     colors = apply_theme(page, settings.color_scheme)
     page.title = "MD"
@@ -28,6 +35,11 @@ def main(page: ft.Page) -> None:
     page.services.append(file_picker)
 
     def remember_dir(directory: str) -> None:
+        """记住最近一次导出目录。
+
+        :param directory: 文件夹路径
+        :return: None
+        """
         settings_now = load_settings()
         if settings_now.default_save_dir == directory:
             return
@@ -35,6 +47,10 @@ def main(page: ft.Page) -> None:
         save_settings(settings_now)
 
     async def pick_paths() -> list[str]:
+        """弹出多选文件对话框。
+
+        :return: 选中的文件路径列表
+        """
         if sys.platform.startswith("linux") and linux_file_dialog.zenity_available():
             return await linux_file_dialog.pick_files(
                 title=t(load_settings().language, "choose_files"),
@@ -44,6 +60,13 @@ def main(page: ft.Page) -> None:
         return [f.path for f in files if getattr(f, "path", None)]
 
     async def pick_save_path(lang: str, default_name: str, initial: str) -> str | None:
+        """弹出另存为对话框。
+
+        :param lang: 界面语言
+        :param default_name: 建议文件名
+        :param initial: 起始目录
+        :return: 目标路径；取消为 None
+        """
         if sys.platform.startswith("linux") and linux_file_dialog.zenity_available():
             return await linux_file_dialog.save_file(
                 title=t(lang, "save_file"),
@@ -57,6 +80,12 @@ def main(page: ft.Page) -> None:
         )
 
     async def pick_folder(lang: str, initial: str) -> str | None:
+        """弹出文件夹选择框。
+
+        :param lang: 界面语言
+        :param initial: 起始目录
+        :return: 目录路径；取消为 None
+        """
         if sys.platform.startswith("linux") and linux_file_dialog.zenity_available():
             return await linux_file_dialog.pick_directory(
                 title=t(lang, "choose_export_folder"),
@@ -68,6 +97,11 @@ def main(page: ft.Page) -> None:
         )
 
     async def pick_and_convert(_e: ft.ControlEvent) -> None:
+        """选文件、转换并导出；多文件先选导出目录。
+
+        :param _e: 点击事件
+        :return: None
+        """
         paths = await pick_paths()
         if not paths:
             return

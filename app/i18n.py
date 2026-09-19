@@ -1,4 +1,8 @@
-from __future__ import annotations
+
+"""界面文案表（简体中文 / English）。
+
+通过 ``t(lang, key, **kwargs)`` 取字符串，支持 ``str.format`` 占位符。
+"""
 
 from typing import Any
 
@@ -280,6 +284,12 @@ _TABLES = {"zh": ZH, "en": EN}
 
 
 def t(lang: str, key: str, **kwargs: Any) -> str:
+    """按语言取翻译，并可填充占位符。
+    :param lang: 语言代码（zh / en）；未知则回退中文表
+    :param key: 文案键
+    :param kwargs: 传给 ``str.format`` 的关键字参数
+    :return: 翻译后的字符串；缺键时返回英文或键名本身
+    """
     table = _TABLES.get(lang) or ZH
     text = table.get(key) or EN.get(key) or key
     if kwargs:

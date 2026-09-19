@@ -1,6 +1,10 @@
-from __future__ import annotations
 
-from typing import Callable
+"""设置全页：语言、导出目录、转换模式、配色与 MCP。
+
+控件变更立即写入 ``settings.json`` 并回调主窗口刷新。
+"""
+
+from typing import Any, Callable
 
 import flet as ft
 
@@ -11,11 +15,16 @@ from app.theme import SCHEME_IDS, apply_theme, palette, scheme_is_dark, u
 
 
 def _btn(control: ft.Control, label: str) -> None:
+    """设置按钮显示文字（Flet 使用 content）。
+    :param control: 按钮控件
+    :param label: 文案
+    :return: None
+    """
     control.content = label
 
 
 class SettingsPage:
-    """Full-page settings; every control applies immediately (no Save)."""
+    """全页设置；每个控件都会立即生效（无需保存按钮）。"""
 
     def __init__(
         self,
@@ -25,6 +34,15 @@ class SettingsPage:
         on_changed: Callable[[AppSettings], None],
         folder_picker: ft.FilePicker,
     ) -> None:
+        """构建设置页控件树。
+
+        :param page: Flet 页面
+        :param settings: 当前设置（会被原地修改）
+        :param on_back: 点击返回时恢复主工作区
+        :param on_changed: 任意项变更后通知主窗口
+        :param folder_picker: 选择导出目录用的 FilePicker
+        :return: None
+        """
         self.page = page
         self.settings = settings
         self.on_back = on_back
@@ -159,12 +177,20 @@ class SettingsPage:
         self._apply_chrome()
 
     def _card(self) -> ft.Container:
+        """创建设置分组卡片容器。
+
+        :return: 带内边距与圆角的 Container
+        """
         return ft.Container(
             padding=ft.Padding.symmetric(horizontal=u(2.5), vertical=u(2)),
             border_radius=u(1.5),
         )
 
     def _rebuild_cards(self) -> None:
+        """把控件组装进各分组卡片。
+
+        :return: None
+        """
         self.general_card.content = ft.Column(
             [self.general_title, ft.Divider(height=1), self.lang_dd],
             spacing=u(1.25),
@@ -223,10 +249,20 @@ class SettingsPage:
             tight=True,
         )
 
-    def _tr(self, key: str, **kwargs) -> str:
+    def _tr(self, key: str, **kwargs: Any) -> str:
+        """当前语言翻译。
+
+        :param key: 文案键
+        :param kwargs: 格式化参数
+        :return: 翻译字符串
+        """
         return t(self.settings.language, key, **kwargs)
 
     def _apply_chrome(self) -> None:
+        """把当前配色应用到卡片、输入框与 MCP 状态区。
+
+        :return: None
+        """
         c = self.colors
         self.header.bgcolor = c["surface"]
         self.title.color = c["ink"]
@@ -278,10 +314,18 @@ class SettingsPage:
             )
 
     def _persist(self) -> None:
+        """写盘并通知主窗口。
+
+        :return: None
+        """
         save_settings(self.settings)
         self.on_changed(self.settings)
 
     def _retranslate(self) -> None:
+        """按语言刷新标签、单选项与 MCP 说明。
+
+        :return: None
+        """
         self.title.value = self._tr("settings_title")
         _btn(self.btn_back, self._tr("back"))
         self.general_title.value = self._tr("section_general")
@@ -320,6 +364,11 @@ class SettingsPage:
         self._refresh_mcp_texts()
 
     def _scheme_chip(self, scheme_id: str) -> ft.Control:
+        """配色预览色块。
+
+        :param scheme_id: 方案 id
+        :return: 可点击的色块控件
+        """
         selected = self.settings.color_scheme == scheme_id
         preview = palette(scheme_id)
         return ft.Container(
@@ -375,9 +424,18 @@ class SettingsPage:
         )
 
     def _refresh_scheme_chips(self) -> None:
+        """重建配色网格。
+
+        :return: None
+        """
         self.scheme_grid.controls = [self._scheme_chip(sid) for sid in SCHEME_IDS]
 
     def _on_scheme(self, scheme_id: str) -> None:
+        """切换配色并立即应用主题。
+
+        :param scheme_id: 新方案 id
+        :return: None
+        """
         self.settings.color_scheme = scheme_id
         self.settings.theme = "dark" if scheme_is_dark(scheme_id) else "light"
         self.colors = apply_theme(self.page, scheme_id)
@@ -387,6 +445,10 @@ class SettingsPage:
         self.page.update()
 
     def _refresh_mcp_texts(self) -> None:
+        """刷新 MCP URL、复制动作与运行状态文案。
+
+        :return: None
+        """
         url = f"http://127.0.0.1:{self.settings.mcp_port}/mcp"
         self.mcp_url_field.value = url
         self.btn_copy_mcp.action = ft.CopyToClipboard(url)
@@ -399,14 +461,29 @@ class SettingsPage:
             self.mcp_status.value = self._tr("mcp_stopped")
 
     def _on_copy_mcp(self, _e: ft.ControlEvent | None = None) -> None:
+        """复制 MCP 地址后的提示。
+
+        :param _e: 点击事件
+        :return: None
+        """
         self.page.show_dialog(
             ft.SnackBar(content=ft.Text(self._tr("copy_ok")), open=True)
         )
 
     def _back(self, _e: ft.ControlEvent | None = None) -> None:
+        """返回主工作区。
+
+        :param _e: 点击事件
+        :return: None
+        """
         self.on_back()
 
     def _on_language(self, e: ft.ControlEvent) -> None:
+        """切换界面语言。
+
+        :param e: 下拉选择事件
+        :return: None
+        """
         self.settings.language = e.control.value or "zh"
         self.lang_dd.text = "简体中文" if self.settings.language == "zh" else "English"
         self._retranslate()
@@ -414,16 +491,31 @@ class SettingsPage:
         self.page.update()
 
     def _on_mode(self, e: ft.ControlEvent) -> None:
+        """切换转换触发方式。
+
+        :param e: 单选组变更事件
+        :return: None
+        """
         self.settings.convert_mode = (  # type: ignore[assignment]
             e.control.value or "drop_immediate"
         )
         self._persist()
 
     def _on_timestamp(self, e: ft.ControlEvent) -> None:
+        """开关导出文件名时间戳前缀。
+
+        :param e: Switch 事件
+        :return: None
+        """
         self.settings.timestamp_prefix = bool(e.control.value)
         self._persist()
 
     def _on_mcp(self, e: ft.ControlEvent) -> None:
+        """开关本机 MCP 服务。
+
+        :param e: Switch 事件
+        :return: None
+        """
         self.settings.mcp_enabled = bool(e.control.value)
         mcp_server.apply_setting(self.settings)
         self._refresh_mcp_texts()
@@ -431,6 +523,11 @@ class SettingsPage:
         self.page.update()
 
     def _on_save_dir_commit(self, _e: ft.ControlEvent | None = None) -> None:
+        """导出起始目录输入框失焦或回车时提交。
+
+        :param _e: 输入事件
+        :return: None
+        """
         path = (self.save_dir_field.value or "").strip()
         if self.settings.default_save_dir == path:
             return
@@ -438,9 +535,18 @@ class SettingsPage:
         self._persist()
 
     def _on_choose_folder(self, _e: ft.ControlEvent | None = None) -> None:
+        """异步打开文件夹对话框。
+
+        :param _e: 点击事件
+        :return: None
+        """
         self.page.run_task(self._choose_folder)
 
     async def _choose_folder(self) -> None:
+        """选择导出起始文件夹并写回设置。
+
+        :return: None
+        """
         title = self._tr("default_save_dir")
         initial = suggested_save_dir(self.settings)
         path = None

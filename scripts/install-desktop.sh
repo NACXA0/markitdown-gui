@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Install MarkItDown GUI AppImage into the user Applications menu.
-# Primary artifact: dist/appimage/MarkItDown_GUI-x86_64.AppImage
+# 把 MarkItDown GUI 的 AppImage 安装到用户应用菜单。
+# 主产物：dist/appimage/MarkItDown_GUI-x86_64.AppImage
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -49,7 +49,7 @@ StartupNotify=true
 StartupWMClass=com.flet.markitdown-gui
 EOF
 
-# Remove stale Flet-bundle desktop entry if present (from earlier install path).
+# 删除旧的 Flet bundle 桌面入口（来自早期安装路径）。
 rm -f "$APP_DIR/com.flet.markitdown-gui.desktop"
 
 if command -v update-desktop-database >/dev/null 2>&1; then

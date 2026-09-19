@@ -1,4 +1,9 @@
-from __future__ import annotations
+
+"""本机 MCP HTTP 服务。
+
+在 127.0.0.1 上提供 JSON-RPC：把本地文件转成 Markdown 文本或写出文件，
+供 Cursor 等 MCP 客户端调用。
+"""
 
 import threading
 from typing import Any
@@ -18,22 +23,42 @@ _port = 12768
 
 
 def is_running() -> bool:
+    """服务线程是否仍在运行。
+
+    :return: 正在监听则为 True
+    """
     return _running
 
 
 def current_url() -> str:
+    """当前 MCP 端点 URL。
+
+    :return: ``http://127.0.0.1:<port>/mcp``
+    """
     return f"http://127.0.0.1:{_port}/mcp"
 
 
 def _build_app() -> FastAPI:
+    """构建 FastAPI 应用（健康检查与 JSON-RPC）。
+
+    :return: 配置好的 FastAPI 实例
+    """
     api = FastAPI(title="markitdown-gui-mcp")
 
     @api.get("/health")
     def health() -> dict[str, str]:
+        """存活探测。
+
+        :return: 固定 ``{"status": "ok"}``
+        """
         return {"status": "ok"}
 
     @api.get("/mcp")
     def info() -> dict[str, Any]:
+        """GET /mcp：服务说明。
+
+        :return: 名称、版本、工具列表等元数据
+        """
         return {
             "name": "markitdown-gui-mcp",
             "version": "0.1.0",
@@ -44,6 +69,11 @@ def _build_app() -> FastAPI:
 
     @api.post("/mcp")
     async def rpc(request: Request) -> JSONResponse:
+        """处理 JSON-RPC POST。
+
+        :param request: FastAPI 请求
+        :return: JSON-RPC result 或 error
+        """
         body = await request.json()
         req_id = body.get("id")
         method = body.get("method") or ""
@@ -67,6 +97,12 @@ def _build_app() -> FastAPI:
 
 
 async def _dispatch(method: str, params: dict[str, Any]) -> Any:
+    """按 MCP 方法名分发。
+    :param method: JSON-RPC method
+    :param params: 方法参数
+    :return: 方法结果对象
+    :raises ValueError: 未知方法
+    """
     if method in {"initialize", "notifications/initialized"}:
         return {
             "protocolVersion": "2024-11-05",
@@ -115,6 +151,12 @@ async def _dispatch(method: str, params: dict[str, Any]) -> Any:
 
 
 def _call_tool(params: dict[str, Any]) -> dict[str, Any]:
+    """执行 convert_to_text / convert_to_file。
+    :param params: 含 ``name`` 与 ``arguments`` 的 tools/call 参数
+    :return: MCP content 响应
+    :raises ValueError: 缺路径或未知工具
+    :raises RuntimeError: 转换失败
+    """
     name = params.get("name")
     args = params.get("arguments") or {}
     path = args.get("path")
@@ -144,6 +186,10 @@ def _call_tool(params: dict[str, Any]) -> dict[str, Any]:
 
 
 def start(port: int = 12768) -> None:
+    """在后台线程启动 uvicorn（仅监听本机）。
+    :param port: 监听端口
+    :return: None
+    """
     global _server, _thread, _running, _port
     stop()
     with _lock:
@@ -160,6 +206,10 @@ def start(port: int = 12768) -> None:
         _running = True
 
         def _run() -> None:
+            """阻塞运行 uvicorn，退出时清除运行标志。
+
+            :return: None
+            """
             global _running
             try:
                 server.run()
@@ -171,7 +221,10 @@ def start(port: int = 12768) -> None:
 
 
 def stop() -> None:
-    """Stop MCP HTTP server and release the port."""
+    """停止 MCP HTTP 服务并释放端口。
+
+    :return: None
+    """
     global _server, _thread, _running
     with _lock:
         server = _server
@@ -192,6 +245,10 @@ def stop() -> None:
 
 
 def apply_setting(settings: AppSettings) -> None:
+    """按设置开关 MCP 服务。
+    :param settings: 含 ``mcp_enabled`` 与 ``mcp_port``
+    :return: None
+    """
     if settings.mcp_enabled:
         start(settings.mcp_port)
     else:

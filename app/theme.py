@@ -1,12 +1,20 @@
-from __future__ import annotations
+
+"""配色方案与 Flet 主题应用。
+
+每种方案自带浅/深属性；布局间距通过密度单位 ``u()`` 换算。
+"""
 
 import flet as ft
 
-# Density unit. Prefer expand / col for layout; use u() instead of one-off px.
+# 密度单位。布局优先用 expand / col；统一用 u()，避免到处写死 px。
 U = 8.0
 
 
 def u(n: float) -> float:
+    """把密度单位换成像素值。
+    :param n: 密度倍数
+    :return: ``n * U``
+    """
     return n * U
 
 
@@ -14,10 +22,15 @@ ColorSchemeId = str
 
 
 def _scheme(*, dark: bool, **colors: str) -> dict[str, str | bool]:
+    """构造一份配色字典。
+    :param dark: 该方案是否按深色主题应用
+    :param colors: 语义色名到十六进制颜色的映射
+    :return: 含 ``dark`` 标记的配色表
+    """
     return {"dark": dark, **colors}
 
 
-# Each scheme is itself light or dark. No separate dark-mode switch.
+# 每种配色自身就是浅色或深色，没有单独的深色模式开关。
 SCHEMES: dict[str, dict[str, str | bool]] = {
     "snow": _scheme(
         dark=False,
@@ -178,21 +191,38 @@ SCHEME_COLOR_KEYS = (
 
 
 def resolve_scheme(scheme: str | None) -> str:
+    """把用户选择规范成已知方案 id。
+    :param scheme: 配色 id；未知或为空则用默认
+    :return: ``SCHEMES`` 中的键
+    """
     if scheme in SCHEMES:
         return scheme
     return DEFAULT_SCHEME
 
 
 def scheme_is_dark(scheme: str | None) -> bool:
+    """判断配色是否应按深色主题应用。
+    :param scheme: 配色 id
+    :return: 深色则为 True
+    """
     return bool(SCHEMES[resolve_scheme(scheme)].get("dark"))
 
 
 def palette(scheme: str | None = None) -> dict[str, str]:
+    """取出方案中的语义色（不含 dark 标记）。
+    :param scheme: 配色 id
+    :return: 颜色键到十六进制字符串的映射
+    """
     family = SCHEMES[resolve_scheme(scheme)]
     return {key: str(family[key]) for key in SCHEME_COLOR_KEYS}
 
 
 def apply_theme(page: ft.Page, scheme: str | None = None) -> dict[str, str]:
+    """把配色应用到 Flet 页面并返回调色板。
+    :param page: Flet 页面
+    :param scheme: 配色 id
+    :return: 语义色字典，供控件直接使用
+    """
     colors = palette(scheme)
     dark = scheme_is_dark(scheme)
     page.theme_mode = ft.ThemeMode.DARK if dark else ft.ThemeMode.LIGHT

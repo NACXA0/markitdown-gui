@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launch the Linux release bundle (includes flet-dropzone).
+# 启动 Linux 发布包（含 flet-dropzone）。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BIN=""

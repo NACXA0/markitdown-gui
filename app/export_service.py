@@ -1,4 +1,8 @@
-from __future__ import annotations
+"""Markdown 导出服务。
+
+把转换得到的 Markdown 写成 .md，或经 Pandoc 导出为 Word / HTML / PDF，
+也可打包成 ZIP。支持时间戳前缀与重名避让。
+"""
 
 import shutil
 import subprocess
@@ -13,20 +17,34 @@ from app.settings import AppSettings
 
 @dataclass
 class ExportResult:
+    """一次导出操作的结果。
+    :param path: 实际写出的文件路径
+    :param renamed: 是否因重名而改写了文件名
+    :param original_name: 未避让前的目标文件名
+    """
+
     path: str
     renamed: bool
     original_name: str
 
 
 class ExportError(Exception):
-    pass
+    """导出失败（缺少 Pandoc、格式不支持或外部进程出错）。"""
 
 
 def _project_root() -> Path:
+    """返回仓库根目录。
+
+    :return: ``export_service.py`` 所在包的上一级目录
+    """
     return Path(__file__).resolve().parent.parent
 
 
 def find_pandoc() -> Path | None:
+    """查找捆绑或系统 PATH 中的 pandoc 可执行文件。
+
+    :return: pandoc 路径；找不到时为 None
+    """
     bundled = _project_root() / "bin" / "pandoc"
     if bundled.is_file() and bundled.stat().st_mode & 0o111:
         return bundled
@@ -35,6 +53,10 @@ def find_pandoc() -> Path | None:
 
 
 def format_extension(fmt: str) -> str:
+    """把导出格式名规范成文件扩展名。
+    :param fmt: 用户选择的格式（如 md / markdown / docx）
+    :return: 不含点的扩展名
+    """
     fmt = fmt.lower().strip()
     if fmt in {"md", "markdown"}:
         return "md"
@@ -42,6 +64,11 @@ def format_extension(fmt: str) -> str:
 
 
 def build_stem(settings: AppSettings, source_path: str) -> str:
+    """按设置生成输出文件名主干（不含扩展名）。
+    :param settings: 应用设置（是否加时间戳前缀）
+    :param source_path: 源文件路径
+    :return: 输出文件名主干
+    """
     base = Path(source_path).stem or "output"
     if settings.timestamp_prefix:
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -50,6 +77,12 @@ def build_stem(settings: AppSettings, source_path: str) -> str:
 
 
 def unique_output_path(directory: Path, stem: str, ext: str) -> tuple[Path, bool, str]:
+    """在目录中生成不覆盖已有文件的输出路径。
+    :param directory: 目标目录
+    :param stem: 文件名主干
+    :param ext: 扩展名（不含点）
+    :return: (最终路径, 是否改名, 原始文件名)
+    """
     original_name = f"{stem}.{ext}"
     candidate = directory / original_name
     if not candidate.exists():
@@ -64,6 +97,11 @@ def unique_output_path(directory: Path, stem: str, ext: str) -> tuple[Path, bool
 
 
 def resolve_save_dir(settings: AppSettings, save_dir: str | None = None) -> Path:
+    """解析并创建导出目录。
+    :param settings: 应用设置（回退目录）
+    :param save_dir: 显式指定的目录；空则使用设置中的目录
+    :return: 已存在的导出目录
+    """
     directory = (save_dir or "").strip() or settings.resolved_save_dir()
     path = Path(directory).expanduser()
     path.mkdir(parents=True, exist_ok=True)
@@ -71,11 +109,23 @@ def resolve_save_dir(settings: AppSettings, save_dir: str | None = None) -> Path
 
 
 def _write_markdown(markdown: str, dest: Path) -> None:
+    """将 Markdown 文本写入 UTF-8 文件。
+    :param markdown: Markdown 正文
+    :param dest: 目标文件路径
+    :return: None
+    """
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(markdown, encoding="utf-8")
 
 
 def _write_with_pandoc(markdown: str, fmt: str, dest: Path) -> None:
+    """通过 Pandoc 把 Markdown 转成指定格式并写入 ``dest``。
+    :param markdown: Markdown 正文
+    :param fmt: 目标格式（docx / html / pdf）
+    :param dest: 输出文件路径
+    :return: None
+    :raises ExportError: 格式不支持、找不到 Pandoc 或转换失败
+    """
     ext_map = {"docx": "docx", "html": "html", "pdf": "pdf"}
     if fmt not in ext_map:
         raise ExportError(f"Unsupported format: {fmt}")
@@ -126,6 +176,14 @@ def export_to_path(
     fmt: str,
     output_path: str,
 ) -> ExportResult:
+    """导出到用户指定的完整路径（不自动改名）。
+    :param settings: 应用设置（当前导出路径本身不依赖设置）
+    :param source_path: 源文件路径（保留参数以便调用方统一签名）
+    :param markdown: Markdown 正文
+    :param fmt: 导出格式
+    :param output_path: 目标文件路径
+    :return: 导出结果
+    """
     dest = Path(output_path).expanduser()
     fmt = fmt.lower().strip()
     if fmt in {"md", "markdown"}:
@@ -141,6 +199,13 @@ def export_markdown(
     markdown: str,
     save_dir: str | None = None,
 ) -> ExportResult:
+    """把 Markdown 保存到目录，必要时自动改名避免覆盖。
+    :param settings: 应用设置（时间戳、默认目录）
+    :param source_path: 源文件路径，用于生成文件名
+    :param markdown: Markdown 正文
+    :param save_dir: 目标目录；空则使用设置中的目录
+    :return: 导出结果
+    """
     directory = resolve_save_dir(settings, save_dir)
     stem = build_stem(settings, source_path)
     out, renamed, original_name = unique_output_path(directory, stem, "md")
@@ -156,6 +221,15 @@ def export_with_format(
     save_dir: str | None = None,
     output_path: str | None = None,
 ) -> ExportResult:
+    """按格式导出；可指定完整路径或仅指定目录。
+    :param settings: 应用设置
+    :param source_path: 源文件路径
+    :param markdown: Markdown 正文
+    :param fmt: 导出格式
+    :param save_dir: 未指定 ``output_path`` 时的目录
+    :param output_path: 若给出则直接写到该路径
+    :return: 导出结果
+    """
     fmt = fmt.lower().strip()
     if output_path:
         return export_to_path(settings, source_path, markdown, fmt, output_path)
@@ -172,6 +246,12 @@ def export_with_format(
 
 
 def unique_archive_name(used: set[str], stem: str, ext: str) -> str:
+    """在 ZIP 内生成不重复的条目名，并登记到 ``used``。
+    :param used: 已占用的条目名集合（会被原地修改）
+    :param stem: 文件名主干
+    :param ext: 扩展名（不含点）
+    :return: ZIP 内相对路径名
+    """
     original = f"{stem}.{ext}"
     candidate = original
     index = 1
@@ -190,6 +270,12 @@ def export_zip(
     files: list[tuple[str, str]],
     output_path: str,
 ) -> ExportResult:
+    """把多份 Markdown 打成一个 ZIP。
+    :param settings: 应用设置（条目命名）
+    :param files: ``(源路径, Markdown 正文)`` 列表
+    :param output_path: ZIP 输出路径
+    :return: 导出结果
+    """
     dest = Path(output_path).expanduser()
     dest.parent.mkdir(parents=True, exist_ok=True)
     used: set[str] = set()

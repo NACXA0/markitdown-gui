@@ -1,8 +1,12 @@
-from __future__ import annotations
+
+"""主窗口：文件队列、预览、转换与导出。
+
+负责拖放/选择文件、调用转换引擎、分栏布局以及与设置页切换。
+"""
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 import os
 import sys
 
@@ -16,7 +20,7 @@ from app.theme import apply_theme, scheme_is_dark, u
 from app.views.float_ball import stop_float_ball
 from app.views.settings_view import SettingsPage
 
-# label, fill, corner radius factor, icon
+# 标签、填充色、圆角系数、图标
 _TYPE_BADGES: dict[str, tuple[str, str, float, str]] = {
     ".pdf": ("PDF", "#C44536", 0.7, ft.Icons.PICTURE_AS_PDF),
     ".doc": ("DOC", "#2B579A", 1.2, ft.Icons.DESCRIPTION),
@@ -47,17 +51,30 @@ _TYPE_BADGES: dict[str, tuple[str, str, float, str]] = {
 
 
 def _btn_label(control: ft.Control, label: str) -> None:
-    """Flet 0.86+ buttons use `content`, not `text`."""
+    """Flet 0.86+ 的按钮用 `content` 属性，而不是 `text`。
+    :param control: 按钮控件
+    :param label: 显示文字
+    :return: None
+    """
     control.content = label
 
 
 def _disabled_colors(scheme: str) -> tuple[str, str]:
+    """禁用态前景/背景色。
+    :param scheme: 当前配色 id
+    :return: (前景色, 背景色)
+    """
     if scheme_is_dark(scheme):
         return "#6E6E74", "#2A2A30"
     return "#8A8A86", "#D8D8D4"
 
 
 def _filled_button_style(colors: dict[str, str], scheme: str) -> ft.ButtonStyle:
+    """实心按钮样式（含禁用态）。
+    :param colors: 语义色表
+    :param scheme: 配色 id
+    :return: Flet ButtonStyle
+    """
     disabled_fg, disabled_bg = _disabled_colors(scheme)
     return ft.ButtonStyle(
         bgcolor={
@@ -80,6 +97,11 @@ def _filled_button_style(colors: dict[str, str], scheme: str) -> ft.ButtonStyle:
 
 
 def _outlined_button_style(colors: dict[str, str], scheme: str) -> ft.ButtonStyle:
+    """描边按钮样式（含禁用态）。
+    :param colors: 语义色表
+    :param scheme: 配色 id
+    :return: Flet ButtonStyle
+    """
     disabled_fg, disabled_bg = _disabled_colors(scheme)
     return ft.ButtonStyle(
         bgcolor={
@@ -106,7 +128,12 @@ def _outlined_button_style(colors: dict[str, str], scheme: str) -> ft.ButtonStyl
 
 
 def _use_native_dropzone() -> bool:
-    """Official `python main.py` client has no flet_dropzone widget."""
+    """是否启用原生 Dropzone 控件。
+
+    官方 ``python main.py`` 客户端没有 flet_dropzone；可用环境变量覆盖。
+
+    :return: 应使用 Dropzone 则为 True
+    """
     flag = os.environ.get("MARKITDOWN_DROPZONE", "").strip().lower()
     if flag in {"1", "true", "yes", "on"}:
         return True
@@ -120,6 +147,10 @@ def _use_native_dropzone() -> bool:
 
 
 def _format_size(num: int) -> str:
+    """把字节数格式化为可读大小。
+    :param num: 文件大小（字节）
+    :return: 如 ``12.3 KB``
+    """
     size = float(max(0, num))
     for unit in ("B", "KB", "MB", "GB", "TB"):
         if size < 1024 or unit == "TB":
@@ -132,6 +163,10 @@ def _format_size(num: int) -> str:
 
 
 def _count_stats(text: str) -> tuple[int, int]:
+    """统计非空白字符数与行数。
+    :param text: Markdown 或普通文本
+    :return: (字符数, 行数)
+    """
     if not text:
         return 0, 0
     chars = sum(1 for c in text if not c.isspace())
@@ -140,6 +175,10 @@ def _count_stats(text: str) -> tuple[int, int]:
 
 
 def _file_kind(name: str) -> tuple[str, str, float, str]:
+    """按扩展名取类型徽章信息。
+    :param name: 文件名
+    :return: (短标签, 填充色, 圆角密度, 图标名)
+    """
     ext = Path(name).suffix.lower()
     return _TYPE_BADGES.get(
         ext, ("FILE", "#5A675F", 1.0, ft.Icons.INSERT_DRIVE_FILE)
@@ -148,6 +187,15 @@ def _file_kind(name: str) -> tuple[str, str, float, str]:
 
 @dataclass
 class QueueItem:
+    """队列中的一个源文件及其转换状态。
+    :param path: 源路径
+    :param name: 显示用文件名
+    :param size_bytes: 文件大小
+    :param status: pending / converting / done / error
+    :param markdown: 转换成功后的正文
+    :param error: 失败信息
+    :param id: 列表项稳定 id
+    """
     path: str
     name: str
     size_bytes: int = 0
@@ -157,12 +205,23 @@ class QueueItem:
     id: str = field(default_factory=lambda: "")
 
     def __post_init__(self) -> None:
+        """若未指定 id，则用路径与对象身份生成。
+
+        :return: None
+        """
         if not self.id:
             self.id = f"{self.path}-{id(self)}"
 
 
 class MainApp:
+    """主工作区控制器：构建控件树并处理转换/导出交互。"""
+
     def __init__(self, page: ft.Page) -> None:
+        """创建主界面并挂到页面。
+
+        :param page: Flet 页面
+        :return: None
+        """
         self.page = page
         self.settings = AppSettings()
         self.items: list[QueueItem] = []
@@ -432,6 +491,11 @@ class MainApp:
         page.add(self.shell)
 
     def bootstrap(self, settings: AppSettings) -> None:
+        """应用已加载的设置、刷新界面，并按需启动 MCP。
+
+        :param settings: 启动时的用户设置
+        :return: None
+        """
         self.settings = settings
         self.colors = apply_theme(self.page, settings.color_scheme)
         self._apply_chrome()
@@ -443,10 +507,20 @@ class MainApp:
         stop_float_ball()
 
     def _on_page_resize(self, _e: ft.PageResizeEvent | None = None) -> None:
+        """窗口尺寸变化时重算分栏宽度。
+
+        :param _e: 缩放事件（可忽略）
+        :return: None
+        """
         self._apply_split()
         self.page.update()
 
     def _on_layout_change(self, e: ft.ControlEvent) -> None:
+        """切换「文件 / 分栏 / 预览」布局。
+
+        :param e: 分段按钮事件
+        :return: None
+        """
         selected = list(e.control.selected or ["split"])
         self.layout_mode = selected[0] if selected else "split"
         self._apply_split()
@@ -454,6 +528,11 @@ class MainApp:
         self.page.update()
 
     def _on_split_drag(self, e: ft.DragUpdateEvent) -> None:
+        """拖动中间分隔条调整左右宽度比。
+
+        :param e: 水平拖动事件
+        :return: None
+        """
         if self.layout_mode != "split":
             return
         dx = 0.0
@@ -469,10 +548,18 @@ class MainApp:
         self.page.update()
 
     def _body_width(self) -> float:
+        """工作区可用宽度（减去外边距）。
+
+        :return: 像素宽度
+        """
         width = float(self.page.width or 1100)
         return max(u(40), width - u(4))
 
     def _apply_split(self) -> None:
+        """按 ``layout_mode`` 显示/隐藏左右栏并设置宽度。
+
+        :return: None
+        """
         mode = self.layout_mode
         total = self._body_width()
         show_files = mode in {"files", "split"}
@@ -499,16 +586,31 @@ class MainApp:
             self.preview_panel.expand = True
 
     def _on_drag_entered(self, _e: ft.ControlEvent | None = None) -> None:
+        """文件拖入投放区时高亮。
+
+        :param _e: 拖入事件
+        :return: None
+        """
         self.dragging = True
         self._style_drag_chrome()
         self.page.update()
 
     def _on_drag_exited(self, _e: ft.ControlEvent | None = None) -> None:
+        """文件拖出投放区时取消高亮。
+
+        :param _e: 拖出事件
+        :return: None
+        """
         self.dragging = False
         self._style_drag_chrome()
         self.page.update()
 
     async def _on_dropped(self, e: ftd.DropzoneEvent) -> None:
+        """处理 Dropzone 放下的本地文件路径。
+
+        :param e: 含 files 列表的投放事件
+        :return: None
+        """
         paths: list[str] = []
         for file in e.files or []:
             path = getattr(file, "path", None)
@@ -523,6 +625,10 @@ class MainApp:
             self.page.update()
 
     def _style_drag_chrome(self) -> None:
+        """按是否正在拖放更新投放区边框与遮罩。
+
+        :return: None
+        """
         c = self.colors
         self.drag_veil.visible = self.dragging and bool(self.items)
         if self.dragging:
@@ -533,14 +639,28 @@ class MainApp:
         self._sync_drop_copy()
 
     def _style_file_stage(self) -> None:
+        """恢复文件区默认背景与边框。
+
+        :return: None
+        """
         c = self.colors
         self.file_stage.bgcolor = c["surface_alt"]
         self.file_stage.border = ft.Border.all(1, c["line"])
 
-    def _tr(self, key: str, **kwargs) -> str:
+    def _tr(self, key: str, **kwargs: Any) -> str:
+        """当前语言下的翻译。
+
+        :param key: 文案键
+        :param kwargs: 格式化参数
+        :return: 翻译字符串
+        """
         return t(self.settings.language, key, **kwargs)
 
     def _markdown_styles(self) -> ft.MarkdownStyleSheet:
+        """渲染预览用的 Markdown 样式。
+
+        :return: 与当前配色匹配的样式表
+        """
         c = self.colors
         return ft.MarkdownStyleSheet(
             p_text_style=ft.TextStyle(height=1.55, color=c["ink"]),
@@ -551,6 +671,10 @@ class MainApp:
         )
 
     def _apply_chrome(self) -> None:
+        """把当前配色套到顶栏、预览、按钮等控件。
+
+        :return: None
+        """
         c = self.colors
         self.page.bgcolor = c["bg"]
         self.wordmark.color = c["accent"]
@@ -612,6 +736,10 @@ class MainApp:
         self._sync_action_states()
 
     def _sync_mode_button(self) -> None:
+        """同步源码/渲染切换按钮的图标与文字。
+
+        :return: None
+        """
         rendered = self.preview_mode == "rendered"
         self.btn_preview_mode.icon = ft.Icons.CODE if rendered else ft.Icons.MENU_BOOK
         _btn_label(
@@ -620,6 +748,10 @@ class MainApp:
         )
 
     def _sync_drop_copy(self) -> None:
+        """更新空状态与拖放遮罩上的提示文案。
+
+        :return: None
+        """
         active = self.dragging
         self.empty_drop_title.value = (
             self._tr("drop_active") if active else self._tr("drop_title")
@@ -632,6 +764,10 @@ class MainApp:
         self.empty_drop_icon.size = u(5)
 
     def _retranslate(self) -> None:
+        """语言变更后刷新所有可见文案。
+
+        :return: None
+        """
         self.page.title = self._tr("app_name")
         self.wordmark.value = self._tr("wordmark")
         _btn_label(self.btn_add, self._tr("add_more"))
@@ -651,11 +787,20 @@ class MainApp:
         self._sync_action_states()
 
     def snack(self, message: str) -> None:
+        """底部短暂提示。
+
+        :param message: 提示文字
+        :return: None
+        """
         self.page.show_dialog(
             ft.SnackBar(content=ft.Text(message), open=True)
         )
 
     def _sync_pick_action(self) -> None:
+        """把「添加/选择文件」绑定到系统文件选择器。
+
+        :return: None
+        """
         action = ft.PickFiles(
             self.file_picker,
             allow_multiple=True,
@@ -666,18 +811,38 @@ class MainApp:
         self.btn_choose.action = action
 
     def _on_files_picked(self, e: ft.FilePickerResultEvent) -> None:
+        """FilePicker 回调：把选中路径加入队列。
+
+        :param e: 选择结果
+        :return: None
+        """
         files = e.files or []
         paths = [f.path for f in files if getattr(f, "path", None)]
         if paths:
             self.add_paths(paths)
 
     def _on_browse_click(self, _e: ft.ControlEvent | None = None) -> None:
+        """点击浏览时异步打开文件对话框。
+
+        :param _e: 点击事件
+        :return: None
+        """
         self.page.run_task(self._browse)
 
     def _on_copy_click(self, _e: ft.ControlEvent | None = None) -> None:
+        """复制当前预览文本。
+
+        :param _e: 点击事件
+        :return: None
+        """
         self.page.run_task(self._copy_preview)
 
     def _on_export_one(self, _e: ft.ControlEvent | None = None) -> None:
+        """弹出单文件导出格式选择。
+
+        :param _e: 点击事件
+        :return: None
+        """
         if self.btn_export_one.disabled:
             return
         self._show_choice_dialog(
@@ -691,6 +856,11 @@ class MainApp:
         )
 
     def _on_export_all(self, _e: ft.ControlEvent | None = None) -> None:
+        """弹出批量导出（文件夹或 ZIP）选择。
+
+        :param _e: 点击事件
+        :return: None
+        """
         if self.btn_export_all.disabled:
             return
         self._show_choice_dialog(
@@ -719,6 +889,11 @@ class MainApp:
         c = self.colors
 
         def close_and_run(action: Callable[[], None]) -> None:
+            """关闭对话框后执行所选动作。
+
+            :param action: 无参回调
+            :return: None
+            """
             self.page.pop_dialog()
             action()
 
@@ -752,6 +927,10 @@ class MainApp:
         )
 
     async def _browse(self) -> None:
+        """打开文件选择器并把结果加入队列。
+
+        :return: None
+        """
         title = self._tr("choose_files")
         initial = suggested_save_dir(self.settings)
         paths: list[str] | None = None
@@ -779,6 +958,10 @@ class MainApp:
             self.add_paths(paths)
 
     async def _copy_preview(self) -> None:
+        """把当前预览 Markdown 写入剪贴板。
+
+        :return: None
+        """
         item = self._active()
         text = ""
         if item and item.markdown:
@@ -798,6 +981,11 @@ class MainApp:
             self.snack(self._tr("copy_failed", error=str(exc)))
 
     def add_paths(self, paths: list[str]) -> None:
+        """去重加入队列，并按转换模式决定是否立即转换。
+
+        :param paths: 源文件路径列表
+        :return: None
+        """
         existing = {i.path for i in self.items}
         added: list[QueueItem] = []
         for path in paths:
@@ -830,6 +1018,11 @@ class MainApp:
         self.page.update()
 
     def _status_label(self, item: QueueItem) -> tuple[str | None, str]:
+        """列表项状态文字与颜色。
+
+        :param item: 队列项
+        :return: (状态文案或 None, 颜色)
+        """
         if item.status == "pending":
             return None, self.colors["muted"]
         if item.status == "converting":
@@ -844,6 +1037,11 @@ class MainApp:
         return None, self.colors["muted"]
 
     def _remove_item(self, item_id: str) -> None:
+        """从队列移除一项并刷新界面。
+
+        :param item_id: 队列项 id
+        :return: None
+        """
         self.items = [i for i in self.items if i.id != item_id]
         if self.active_id == item_id:
             self.active_id = self.items[0].id if self.items else None
@@ -851,14 +1049,34 @@ class MainApp:
         self._refresh_preview()
         self.page.update()
 
-    def _make_remove(self, item_id: str) -> Callable:
+    def _make_remove(self, item_id: str) -> Callable[[ft.ControlEvent], None]:
+        """生成「移除」按钮回调。
+
+        :param item_id: 要删除的项 id
+        :return: 点击处理函数
+        """
         def _remove(_e: ft.ControlEvent) -> None:
+            """执行移除。
+
+            :param _e: 点击事件
+            :return: None
+            """
             self._remove_item(item_id)
 
         return _remove
 
-    def _make_select(self, item_id: str) -> Callable:
+    def _make_select(self, item_id: str) -> Callable[[ft.ControlEvent], None]:
+        """生成选中列表项的回调。
+
+        :param item_id: 要选中的项 id
+        :return: 点击处理函数
+        """
         def _select(_e: ft.ControlEvent) -> None:
+            """设为当前预览项。
+
+            :param _e: 点击事件
+            :return: None
+            """
             self.active_id = item_id
             self._refresh_workspace()
             self._refresh_preview()
@@ -867,6 +1085,11 @@ class MainApp:
         return _select
 
     def _type_badge(self, name: str) -> ft.Control:
+        """文件类型色块图标。
+
+        :param name: 文件名
+        :return: 圆形/圆角色块控件
+        """
         _label, fill, radius_u, icon = _file_kind(name)
         side = u(4.5)
         return ft.Container(
@@ -879,6 +1102,11 @@ class MainApp:
         )
 
     def _item_leading(self, item: QueueItem) -> ft.Control:
+        """列表项左侧：转换中为进度环，否则为类型徽章。
+
+        :param item: 队列项
+        :return: 前导控件
+        """
         side = u(4.5)
         if item.status == "converting":
             return ft.Container(
@@ -897,6 +1125,11 @@ class MainApp:
         return self._type_badge(item.name)
 
     def _rail_row_for(self, item: QueueItem) -> ft.Control:
+        """构建单行文件列表项。
+
+        :param item: 队列项
+        :return: 可点击的行容器
+        """
         status, color = self._status_label(item)
         active = item.id == self.active_id
         name_color = self.colors["ink"] if active else self.colors["muted"]
@@ -939,6 +1172,10 @@ class MainApp:
         )
 
     def _refresh_progress(self) -> None:
+        """更新顶部转换进度条与计数。
+
+        :return: None
+        """
         total = len(self.items)
         done = sum(1 for i in self.items if i.status == "done")
         processed = sum(1 for i in self.items if i.status in {"done", "error"})
@@ -952,14 +1189,26 @@ class MainApp:
         )
 
     def _refresh_file_list(self) -> None:
+        """重建文件列表控件。
+
+        :return: None
+        """
         self.file_list.controls = [self._rail_row_for(i) for i in self.items]
         self._refresh_progress()
 
     def _has_previewable(self) -> bool:
+        """当前选中项是否已有 Markdown。
+
+        :return: 可预览则为 True
+        """
         item = self._active()
         return bool(item and item.markdown)
 
     def _sync_action_states(self) -> None:
+        """按布局与队列状态启用/禁用工具栏按钮。
+
+        :return: None
+        """
         files_visible = self.layout_mode in {"files", "split"}
         preview_visible = self.layout_mode in {"preview", "split"}
         has_files = bool(self.items)
@@ -1018,6 +1267,10 @@ class MainApp:
         self.btn_settings.tooltip = self._tr("tip_settings")
 
     def _refresh_workspace(self) -> None:
+        """刷新空状态、列表、分栏与按钮状态。
+
+        :return: None
+        """
         has_files = bool(self.items)
         self._sync_action_states()
         self.files_col.visible = has_files
@@ -1035,6 +1288,10 @@ class MainApp:
         self._sync_mode_button()
 
     def _active_index(self) -> int:
+        """当前选中项在列表中的下标。
+
+        :return: 下标；空队列为 -1
+        """
         if not self.items:
             return -1
         for i, item in enumerate(self.items):
@@ -1043,6 +1300,11 @@ class MainApp:
         return 0
 
     def _select_index(self, index: int) -> None:
+        """按索引选中队列项并刷新预览。
+
+        :param index: 目标下标（会被夹紧到合法范围）
+        :return: None
+        """
         if not self.items:
             return
         index = max(0, min(index, len(self.items) - 1))
@@ -1052,6 +1314,11 @@ class MainApp:
         self.page.update()
 
     def _on_keyboard(self, e: ft.KeyboardEvent) -> None:
+        """方向键在文件列表中上下移动选中项。
+
+        :param e: 键盘事件
+        :return: None
+        """
         if self.shell.content is not self.workspace:
             return
         if len(self.items) < 2:
@@ -1064,17 +1331,31 @@ class MainApp:
             self._select_index(idx - 1)
 
     def _active(self) -> QueueItem | None:
+        """当前预览对应的队列项。
+
+        :return: 选中项；否则第一项或 None
+        """
         for item in self.items:
             if item.id == self.active_id:
                 return item
         return self.items[0] if self.items else None
 
     def _set_preview_stats(self, text: str | None) -> None:
+        """更新预览区字数/行数标签。
+
+        :param text: 当前正文；空则隐藏统计
+        :return: None
+        """
         chars, lines = _count_stats(text or "")
         self.preview_stats.value = self._tr("preview_stats", chars=chars, lines=lines)
         self.preview_stats.visible = bool(text)
 
     def _show_placeholder(self, message: str) -> None:
+        """在预览区显示居中提示而非正文。
+
+        :param message: 提示文字
+        :return: None
+        """
         self.preview_placeholder.value = message
         self.preview_stack.controls = [
             ft.Container(
@@ -1086,6 +1367,10 @@ class MainApp:
         self._set_preview_stats(None)
 
     def _refresh_preview(self) -> None:
+        """按当前项状态刷新源码或渲染预览。
+
+        :return: None
+        """
         item = self._active()
         if item is None:
             self._show_placeholder(self._tr("no_preview"))
@@ -1111,16 +1396,31 @@ class MainApp:
             self.preview_stack.controls = [self.preview_md]
 
     def _toggle_preview_mode(self, _e: ft.ControlEvent | None = None) -> None:
+        """在源码与渲染预览之间切换。
+
+        :param _e: 点击事件
+        :return: None
+        """
         self.preview_mode = "source" if self.preview_mode == "rendered" else "rendered"
         self._sync_mode_button()
         self._refresh_preview()
         self.page.update()
 
     def _export_as(self, fmt: str) -> None:
+        """记住导出格式并启动单文件另存为。
+
+        :param fmt: md / docx / pdf / html
+        :return: None
+        """
         self.export_format = fmt
         self.page.run_task(self._export_one)
 
     async def _start_convert(self, items: list[QueueItem]) -> None:
+        """多文件时先选保存目录，再在后台线程转换。
+
+        :param items: 待转换队列项
+        :return: None
+        """
         if self.busy or not items:
             return
         dest = None
@@ -1132,6 +1432,11 @@ class MainApp:
         self.page.run_thread(self._convert_items, items)
 
     def _convert_items(self, items: list[QueueItem]) -> None:
+        """同步转换一批文件，可选自动写入目录。
+
+        :param items: 待转换项
+        :return: None
+        """
         self.busy = True
         auto_dir = self.auto_save_dir
         saved = 0
@@ -1172,17 +1477,30 @@ class MainApp:
                 self.snack(self._tr("auto_saved", path=auto_dir))
 
     def _ui_refresh(self) -> None:
+        """从工作线程安全刷新工作区与预览。
+
+        :return: None
+        """
         self._refresh_workspace()
         self._refresh_preview()
         self.page.update()
 
     def _convert_needed(self) -> None:
+        """转换所有 pending/error 项。
+
+        :return: None
+        """
         targets = [i for i in self.items if i.status in {"pending", "error"}]
         if not targets:
             return
         self.page.run_task(self._start_convert, targets)
 
     def _remember_export_dir(self, directory: str) -> None:
+        """把最近导出目录写入设置。
+
+        :param directory: 文件夹路径
+        :return: None
+        """
         directory = str(Path(directory).expanduser())
         if self.settings.default_save_dir == directory:
             return
@@ -1190,6 +1508,11 @@ class MainApp:
         save_settings(self.settings)
 
     async def _pick_save_path(self, default_name: str) -> str | None:
+        """弹出另存为对话框。
+
+        :param default_name: 建议文件名
+        :return: 路径；取消或失败为 None
+        """
         initial = suggested_save_dir(self.settings)
         title = self._tr("save_file")
         ext = Path(default_name).suffix.lstrip(".")
@@ -1216,6 +1539,11 @@ class MainApp:
             return None
 
     async def _pick_export_dir(self, title_key: str = "choose_export_folder") -> str | None:
+        """弹出文件夹选择框。
+
+        :param title_key: i18n 标题键
+        :return: 目录路径；取消或失败为 None
+        """
         title = self._tr(title_key)
         initial = suggested_save_dir(self.settings)
         try:
@@ -1234,10 +1562,19 @@ class MainApp:
             return None
 
     def _toast_export(self, result: export_service.ExportResult) -> None:
+        """用 SnackBar 提示导出路径（含改名情况）。
+
+        :param result: 导出结果
+        :return: None
+        """
         key = "exported_renamed" if result.renamed else "exported"
         self.snack(self._tr(key, path=result.path))
 
     async def _export_one(self) -> None:
+        """导出当前预览为选定格式。
+
+        :return: None
+        """
         item = self._active()
         if not item or not item.markdown:
             return
@@ -1260,6 +1597,10 @@ class MainApp:
             self.snack(self._tr("export_failed", error=str(exc)))
 
     async def _export_all(self) -> None:
+        """把所有已转换文件导出到选定文件夹。
+
+        :return: None
+        """
         done = [i for i in self.items if i.status == "done" and i.markdown]
         if not done:
             return
@@ -1283,6 +1624,10 @@ class MainApp:
             self.snack(self._tr("export_failed", error=str(exc)))
 
     async def _export_zip(self) -> None:
+        """把已转换 Markdown 打成 ZIP。
+
+        :return: None
+        """
         done = [i for i in self.items if i.status == "done" and i.markdown]
         if len(done) < 2:
             return
@@ -1304,6 +1649,10 @@ class MainApp:
             self.snack(self._tr("export_failed", error=str(exc)))
 
     def _clear(self) -> None:
+        """清空队列与预览。
+
+        :return: None
+        """
         self.items.clear()
         self.active_id = None
         self.auto_save_dir = None
@@ -1312,7 +1661,17 @@ class MainApp:
         self.page.update()
 
     def _open_settings(self, _e: ft.ControlEvent | None = None) -> None:
+        """用设置页替换工作区内容。
+
+        :param _e: 点击事件
+        :return: None
+        """
         def on_changed(settings: AppSettings) -> None:
+            """设置即时生效后刷新主界面配色与文案。
+
+            :param settings: 最新设置
+            :return: None
+            """
             self.settings = settings
             self.colors = apply_theme(self.page, settings.color_scheme)
             self._apply_chrome()
@@ -1322,6 +1681,10 @@ class MainApp:
             self.page.update()
 
         def on_back() -> None:
+            """从设置页返回工作区。
+
+            :return: None
+            """
             self.shell.content = self.workspace
             self._apply_chrome()
             self._retranslate()

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Download official pandoc binary into ./bin/pandoc
+# 下载官方 pandoc 二进制到 ./bin/pandoc
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

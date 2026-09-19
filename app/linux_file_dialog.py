@@ -1,11 +1,10 @@
-"""Native file dialogs on Linux (Zenity / KDialog).
+"""Linux 原生文件对话框（Zenity / KDialog）。
 
-Flet FilePicker on Linux often times out if called from Python after the click.
-This helper runs the dialog in a worker thread. Do not pass --modal (without a
-parent window it can fail immediately and look like a dead button).
+Flet 的 FilePicker 在 Linux 上点击后从 Python 调用经常超时。
+本辅助模块把对话框放到工作线程里运行。不要传 --modal（没有父窗口时会立即失败，看起来就像按钮卡死）。
 """
 
-from __future__ import annotations
+
 
 import asyncio
 import os
@@ -15,10 +14,14 @@ from pathlib import Path
 
 
 class DialogUnavailable(RuntimeError):
-    pass
+    """本机没有可用对话框，或启动 zenity/kdialog 失败。"""
 
 
 def _dialog_env() -> dict[str, str]:
+    """复制环境变量，去掉可能让对话框无法弹出的 GDK/Qt 后端强制项。
+
+    :return: 传给子进程的环境字典
+    """
     env = os.environ.copy()
     env.pop("GDK_BACKEND", None)
     env.pop("QT_QPA_PLATFORM", None)
@@ -26,10 +29,20 @@ def _dialog_env() -> dict[str, str]:
 
 
 def zenity_available() -> bool:
+    """是否存在 zenity 或 kdialog。
+
+    :return: 至少有一个对话框工具则 True
+    """
     return shutil.which("zenity") is not None or shutil.which("kdialog") is not None
 
 
 def _run_sync(cmd: list[str], *, cwd: str | None = None) -> tuple[int, str, str]:
+    """同步执行对话框命令。
+    :param cmd: 命令及参数
+    :param cwd: 工作目录
+    :return: (退出码, stdout, stderr)
+    :raises DialogUnavailable: 进程无法启动
+    """
     try:
         proc = subprocess.run(
             cmd,
@@ -49,20 +62,36 @@ def _run_sync(cmd: list[str], *, cwd: str | None = None) -> tuple[int, str, str]
 
 
 async def _run(cmd: list[str], *, cwd: str | None = None) -> tuple[int, str, str]:
+    """在工作线程中执行对话框，避免阻塞 UI 事件循环。
+    :param cmd: 命令及参数
+    :param cwd: 工作目录
+    :return: (退出码, stdout, stderr)
+    """
     return await asyncio.to_thread(_run_sync, cmd, cwd=cwd)
 
 
 def _ok_or_cancel(code: int) -> bool:
-    """True if the tool ran (ok or user cancel). False means it crashed."""
+    """工具正常运行时返回 True（确定或用户取消），False 表示崩溃。
+    :param code: 进程退出码
+    :return: 0/1 视为正常结束
+    """
     return code in {0, 1}
 
 
 def _looks_like_error(stderr: str) -> bool:
+    """粗略判断 stderr 是否包含失败关键词。
+    :param stderr: 标准错误输出
+    :return: 疑似错误则为 True
+    """
     text = stderr.lower()
     return any(token in text for token in ("error", "failed", "cannot", "unable"))
 
 
 def _as_existing_dir(text: str) -> str | None:
+    """把对话框输出整理成目录路径，必要时尝试创建。
+    :param text: zenity/kdialog 打印的路径
+    :return: 目录字符串；空输入为 None
+    """
     raw = text.strip().removeprefix("file://")
     if not raw:
         return None
@@ -75,6 +104,10 @@ def _as_existing_dir(text: str) -> str | None:
 
 
 def _start_cwd(initial_directory: str | None) -> str | None:
+    """为文件夹对话框选择一个有效起始工作目录。
+    :param initial_directory: 用户期望的起始路径
+    :return: 已存在的目录，或 None
+    """
     if not initial_directory:
         return None
     path = Path(initial_directory).expanduser()
@@ -91,7 +124,12 @@ async def pick_files(
     allow_multiple: bool = True,
     initial_directory: str | None = None,
 ) -> list[str] | None:
-    """Return selected paths, [] if cancelled, None if no dialog could start."""
+    """返回选中的路径；取消时返回 []；无法启动对话框时返回 None。
+    :param title: 对话框标题
+    :param allow_multiple: 是否允许多选
+    :param initial_directory: 起始目录
+    :return: 已存在的文件路径列表、空列表或 None
+    """
     zenity = shutil.which("zenity")
     kdialog = shutil.which("kdialog")
     if zenity:
@@ -135,6 +173,12 @@ async def pick_directory(
     title: str = "选择文件夹",
     initial_directory: str | None = None,
 ) -> str | None:
+    """弹出文件夹选择框。
+    :param title: 对话框标题
+    :param initial_directory: 起始目录
+    :return: 选中的目录；取消为 None
+    :raises DialogUnavailable: 没有可用对话框工具
+    """
     zenity = shutil.which("zenity")
     kdialog = shutil.which("kdialog")
     start = _start_cwd(initial_directory)
@@ -177,6 +221,13 @@ async def save_file(
     default_name: str = "output.md",
     initial_directory: str | None = None,
 ) -> str | None:
+    """弹出另存为对话框。
+    :param title: 对话框标题
+    :param default_name: 默认文件名
+    :param initial_directory: 起始目录
+    :return: 用户选择的路径；取消为 None
+    :raises DialogUnavailable: 没有可用对话框工具
+    """
     filename = default_name
     if initial_directory:
         filename = str(Path(initial_directory) / default_name)

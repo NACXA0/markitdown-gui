@@ -3,6 +3,7 @@ name = "markitdown-gui"
 version = "0.1.0"
 description = "Desktop GUI for Microsoft MarkItDown, built with Flet"
 readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.14"
 dependencies = [
     "flet[all]>=1.0.0",
@@ -47,8 +48,7 @@ exclude = [
     "提示词缓存.md",
 ]
 
-# Skip package bytecode compile during packaging — saves /tmp space and avoids
-# long compileall passes that previously aborted this project's Linux builds.
+# 打包时跳过 Python 字节码编译——节省 /tmp 空间，并避免此前导致本项目 Linux 构建中断的长时间 compileall。
 [tool.flet.compile]
 packages = false
 
