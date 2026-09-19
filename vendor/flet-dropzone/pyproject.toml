@@ -1,0 +1,21 @@
+[project]
+name = "flet-dropzone"
+version = "0.4.0+flet1"
+description = "Dropzone control for Flet (patched for Flet 1.0)"
+requires-python = ">=3.10"
+dependencies = [
+    "flet>=0.80.0",
+]
+
+[tool.setuptools]
+packages = ["flet_dropzone", "flutter", "flutter.flet_dropzone"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.package-data]
+"flutter.flet_dropzone" = ["**/*"]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"

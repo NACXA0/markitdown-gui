@@ -5,12 +5,12 @@ description = "Desktop GUI for Microsoft MarkItDown, built with Flet"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "flet[all]>=0.86.5",
+    "flet[all]>=1.0.0",
     "markitdown[pdf,docx,pptx,xlsx,xls,outlook,audio-transcription,youtube-transcription]>=0.1.3",
     "youtube-transcript-api>=1.2.3",
     "fastapi>=0.115",
     "uvicorn>=0.30",
-    "flet-dropzone>=0.4.0",
+    "flet-dropzone",
 ]
 
 [project.scripts]
@@ -24,5 +24,36 @@ dev = [
 [tool.uv]
 package = false
 
+[tool.uv.sources]
+flet-dropzone = { path = "vendor/flet-dropzone" }
+
 [tool.flet]
+product = "MarkItDown GUI"
+artifact = "markitdown-gui"
 desktop_flavor = "light"
+
+[tool.flet.app]
+exclude = [
+    ".git",
+    ".github",
+    ".venv",
+    ".vscode",
+    ".cursor",
+    ".flet",
+    "dist",
+    "vendor",
+    "scripts",
+    "uv.lock",
+    "提示词缓存.md",
+]
+
+# Skip package bytecode compile during packaging — saves /tmp space and avoids
+# long compileall passes that previously aborted this project's Linux builds.
+[tool.flet.compile]
+packages = false
+
+[tool.flet.dev_packages]
+flet-dropzone = "vendor/flet-dropzone"
+
+[tool.flet.linux]
+categories = ["Utility", "Office"]

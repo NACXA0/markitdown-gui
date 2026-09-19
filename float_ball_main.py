@@ -24,6 +24,7 @@ def main(page: ft.Page) -> None:
 
     status = ft.Text(t(settings.language, "float_ready"), size=9, color="white")
     file_picker = ft.FilePicker()
+    page.services.append(file_picker)
 
     async def pick_and_convert(_e: ft.ControlEvent) -> None:
         files = await file_picker.pick_files(allow_multiple=True)

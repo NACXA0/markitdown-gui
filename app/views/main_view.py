@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
+import sys
 
 import flet as ft
 import flet_dropzone as ftd
@@ -44,13 +45,18 @@ class MainApp:
         self.busy = False
         self.preview_mode = "source"
         self.export_format = "md"
-        self.file_view_mode = "cards"  # cards | list
+        self.file_view_mode = "list"  # list | cards
         self.dragging = False
         self.colors = apply_theme(page, "light")
+        self._left_panel_width = 420
 
         self.file_picker = ft.FilePicker()
         self.folder_picker = ft.FilePicker()
         self.clipboard = ft.Clipboard()
+        page.services.extend(
+            [self.file_picker, self.folder_picker, self.clipboard]
+        )
+        page.on_keyboard_event = self._on_keyboard
 
         self.title_text = ft.Text("", size=28, weight=ft.FontWeight.BOLD)
         self.tagline_text = ft.Text("", size=13)
@@ -115,19 +121,37 @@ class MainApp:
             "", on_click=lambda e: self._set_file_view("list")
         )
 
-        self.input_inner = ft.Column(spacing=10, expand=True, scroll=ft.ScrollMode.AUTO)
-        self.input_shell = ft.Container(
-            content=self.input_inner,
+        self.btn_choose = ft.OutlinedButton(
+            "", icon=ft.Icons.FOLDER_OPEN, on_click=self._browse
+        )
+        self.empty_drop_icon = ft.Icon(ft.Icons.UPLOAD_FILE, size=56)
+        self.empty_drop_title = ft.Text(
+            "", size=22, weight=ft.FontWeight.W_600, text_align=ft.TextAlign.CENTER
+        )
+        self.empty_drop_hint = ft.Text("", size=13, text_align=ft.TextAlign.CENTER)
+        self.empty_drop_col = ft.Column(
+            [
+                self.empty_drop_icon,
+                self.empty_drop_title,
+                self.empty_drop_hint,
+                self.btn_choose,
+            ],
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=10,
+        )
+        self.file_list = ft.Column(spacing=6, expand=True, scroll=ft.ScrollMode.AUTO)
+        self.file_stage = ft.Container(
+            content=self.file_list,
+            expand=True,
             padding=16,
             border_radius=16,
-            expand=True,
+            alignment=ft.Alignment.CENTER,
             on_click=self._browse,
             ink=True,
         )
-        # Left panel: click to pick + flet-dropzone OS file drop (needs flet build).
-        self.input_panel = ftd.Dropzone(
-            content=self.input_shell,
-            width=420,
+        self.dropzone = ftd.Dropzone(
+            content=self.file_stage,
+            width=self._left_panel_width,
             expand=False,
             on_dropped=self._on_dropped,
             on_entered=self._on_drag_entered,
@@ -136,18 +160,25 @@ class MainApp:
 
         self.toolbar = ft.Row(
             [
-                self.btn_convert_all,
-                self.btn_convert_sel,
-                self.btn_export_all,
-                self.btn_clear,
-                ft.Container(expand=True),
-                self.view_cards_btn,
-                self.view_list_btn,
-                self.btn_add_more,
+                ft.Row(
+                    [
+                        self.btn_convert_all,
+                        self.btn_convert_sel,
+                        self.btn_export_all,
+                        self.btn_clear,
+                    ],
+                    spacing=8,
+                ),
+                ft.Row(
+                    [
+                        self.view_cards_btn,
+                        self.view_list_btn,
+                        self.btn_add_more,
+                    ],
+                    spacing=8,
+                ),
             ],
-            wrap=True,
-            spacing=8,
-            visible=False,
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
 
         self.preview_panel = ft.Container(
@@ -180,7 +211,7 @@ class MainApp:
         )
 
         self.body_row = ft.Row(
-            [self.input_panel, self.preview_panel],
+            [self.dropzone, self.preview_panel],
             expand=True,
             spacing=12,
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
@@ -230,13 +261,13 @@ class MainApp:
     def _on_drag_entered(self, _e: ft.ControlEvent | None = None) -> None:
         self.dragging = True
         self._style_drag_chrome()
-        self._refresh_input_zone()
+        self._sync_drop_copy()
         self.page.update()
 
     def _on_drag_exited(self, _e: ft.ControlEvent | None = None) -> None:
         self.dragging = False
         self._style_drag_chrome()
-        self._refresh_input_zone()
+        self._sync_drop_copy()
         self.page.update()
 
     async def _on_dropped(self, e: ftd.DropzoneEvent) -> None:
@@ -276,13 +307,22 @@ class MainApp:
         self.status_bar.color = c["muted"]
         self.preview_panel.bgcolor = c["surface"]
         self.preview_panel.border = ft.Border.all(1, c["line"])
+        self.empty_drop_icon.color = c["accent"]
+        self.empty_drop_title.color = c["ink"]
+        self.empty_drop_hint.color = c["muted"]
         self._style_input_shell()
 
     def _style_input_shell(self) -> None:
         c = self.colors
         border_color = c["accent"] if self.dragging else c["line"]
-        self.input_shell.bgcolor = c["accent_soft"] if self.dragging else c["surface"]
-        self.input_shell.border = ft.Border.all(2, border_color)
+        self.file_stage.bgcolor = c["accent_soft"] if self.dragging else c["surface"]
+        self.file_stage.border = ft.Border.all(2, border_color)
+
+    def _sync_drop_copy(self) -> None:
+        self.empty_drop_title.value = (
+            self._tr("drop_active") if self.dragging else self._tr("drop_title")
+        )
+        self.empty_drop_hint.value = self._tr("drop_hint")
 
     def _retranslate(self) -> None:
         self.page.title = self._tr("app_name")
@@ -300,6 +340,8 @@ class MainApp:
         _btn_label(self.mode_render, self._tr("rendered"))
         _btn_label(self.view_cards_btn, self._tr("view_cards"))
         _btn_label(self.view_list_btn, self._tr("view_list"))
+        _btn_label(self.btn_choose, self._tr("choose_files"))
+        self._sync_drop_copy()
         self.format_dd.options = [
             ft.DropdownOption(key="md", text=self._tr("format_md")),
             ft.DropdownOption(key="docx", text=self._tr("format_docx")),
@@ -309,7 +351,6 @@ class MainApp:
 
     def snack(self, message: str) -> None:
         self.status_bar.value = message
-        self.page.show_dialog(ft.SnackBar(content=ft.Text(message), open=True))
         self.page.update()
 
     async def _browse(self, _e: ft.ControlEvent | None = None) -> None:
@@ -450,90 +491,22 @@ class MainApp:
         }
         return mapping.get(ext, ft.Icons.INSERT_DRIVE_FILE)
 
-    def _empty_zone(self) -> list[ft.Control]:
-        title = self._tr("drop_active") if self.dragging else self._tr("drop_title")
+    def _file_rows(self) -> list[ft.Control]:
+        header = ft.Text(
+            self._tr("files_count", count=len(self.items)),
+            size=13,
+            weight=ft.FontWeight.W_600,
+            color=self.colors["muted"],
+        )
+        if self.file_view_mode == "list":
+            return [header, *[self._list_row_for(i) for i in self.items]]
         return [
-            ft.Container(expand=True),
-            ft.Column(
-                [
-                    ft.Icon(
-                        ft.Icons.UPLOAD_FILE,
-                        size=56,
-                        color=self.colors["accent"],
-                    ),
-                    ft.Text(
-                        title,
-                        size=22,
-                        weight=ft.FontWeight.W_600,
-                        color=self.colors["ink"],
-                        text_align=ft.TextAlign.CENTER,
-                    ),
-                    ft.Text(
-                        self._tr("drop_hint"),
-                        size=13,
-                        color=self.colors["muted"],
-                        text_align=ft.TextAlign.CENTER,
-                    ),
-                    ft.OutlinedButton(
-                        self._tr("choose_files"),
-                        icon=ft.Icons.FOLDER_OPEN,
-                        on_click=self._browse,
-                    ),
-                ],
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            header,
+            ft.Row(
+                [self._card_for(i) for i in self.items],
+                wrap=True,
                 spacing=10,
-            ),
-            ft.Container(expand=True),
-        ]
-
-    def _single_file_zone(self, item: QueueItem) -> list[ft.Control]:
-        status, color = self._status_label(item)
-        return [
-            ft.Container(height=8),
-            ft.Container(
-                content=ft.Column(
-                    [
-                        ft.Icon(
-                            self._file_icon(item.name),
-                            size=56,
-                            color=self.colors["accent"],
-                        ),
-                        ft.Text(
-                            item.name,
-                            size=22,
-                            weight=ft.FontWeight.BOLD,
-                            color=self.colors["ink"],
-                            text_align=ft.TextAlign.CENTER,
-                        ),
-                        ft.Text(
-                            item.path,
-                            size=12,
-                            color=self.colors["muted"],
-                            text_align=ft.TextAlign.CENTER,
-                        ),
-                        ft.Text(status, size=13, color=color, weight=ft.FontWeight.W_600),
-                        ft.Row(
-                            [
-                                ft.TextButton(
-                                    self._tr("add_more"), on_click=self._browse
-                                ),
-                                ft.TextButton(
-                                    self._tr("remove_file"),
-                                    on_click=self._make_remove(item.id),
-                                ),
-                            ],
-                            alignment=ft.MainAxisAlignment.CENTER,
-                        ),
-                    ],
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    spacing=10,
-                ),
-                padding=24,
-                border_radius=20,
-                bgcolor=self.colors["accent_soft"],
-                border=ft.Border.all(1, self.colors["accent"]),
-                alignment=ft.Alignment.CENTER,
-                expand=True,
+                run_spacing=10,
             ),
         ]
 
@@ -598,10 +571,19 @@ class MainApp:
                     ft.Column(
                         [
                             ft.Text(
-                                item.name, size=13, weight=ft.FontWeight.W_600
+                                item.name,
+                                size=13,
+                                weight=ft.FontWeight.W_600,
+                                color=self.colors["ink"],
+                                max_lines=1,
+                                overflow=ft.TextOverflow.ELLIPSIS,
                             ),
                             ft.Text(
-                                item.path, size=11, color=self.colors["muted"]
+                                item.path,
+                                size=11,
+                                color=self.colors["muted"],
+                                max_lines=1,
+                                overflow=ft.TextOverflow.ELLIPSIS,
                             ),
                             ft.Text(status, size=11, color=color),
                         ],
@@ -615,69 +597,71 @@ class MainApp:
                         on_click=self._make_remove(item.id),
                     ),
                 ],
-                vertical_alignment=ft.CrossAxisAlignment.START,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
             padding=10,
             border_radius=12,
-            bgcolor=self.colors["accent_soft"] if active else None,
-            border=ft.Border.all(1, self.colors["line"]),
+            bgcolor=self.colors["accent_soft"] if active else self.colors["bg"],
+            border=ft.Border.all(
+                1.5 if active else 1,
+                self.colors["accent"] if active else self.colors["line"],
+            ),
             on_click=self._make_select(item.id),
             ink=True,
         )
 
-    def _multi_file_zone(self) -> list[ft.Control]:
-        header = ft.Row(
-            [
-                ft.Text(
-                    self._tr("files_count", count=len(self.items)),
-                    size=13,
-                    weight=ft.FontWeight.W_600,
-                    color=self.colors["muted"],
-                ),
-                ft.Container(expand=True),
-            ]
-        )
-        if self.file_view_mode == "list":
-            body: ft.Control = ft.Column(
-                [self._list_row_for(i) for i in self.items],
-                spacing=6,
-                scroll=ft.ScrollMode.AUTO,
-                expand=True,
-            )
-        else:
-            body = ft.Row(
-                [self._card_for(i) for i in self.items],
-                wrap=True,
-                spacing=10,
-                run_spacing=10,
-                scroll=ft.ScrollMode.AUTO,
-                expand=True,
-            )
-        return [header, body]
-
     def _refresh_input_zone(self) -> None:
         n = len(self.items)
-        self.toolbar.visible = n > 1
-        self.input_panel.width = 360 if n == 1 else (420 if n > 1 else 480)
+        has_files = n > 0
+        self.dropzone.width = self._left_panel_width
+        self.btn_convert_all.disabled = not has_files
+        self.btn_convert_sel.disabled = not has_files
+        self.btn_export_all.disabled = not has_files
+        self.btn_clear.disabled = not has_files
+        self.view_cards_btn.disabled = not has_files or self.file_view_mode == "cards"
+        self.view_list_btn.disabled = not has_files or self.file_view_mode == "list"
 
-        if n == 0:
-            self.input_inner.controls = self._empty_zone()
-            self.input_shell.on_click = self._browse
-        elif n == 1:
-            self.input_inner.controls = self._single_file_zone(self.items[0])
-            # Don't open picker when clicking the single-file card chrome
-            self.input_shell.on_click = None
+        if has_files:
+            self.file_stage.alignment = ft.Alignment.TOP_LEFT
+            self.file_stage.on_click = None
+            self.file_list.controls = self._file_rows()
         else:
-            self.input_inner.controls = self._multi_file_zone()
-            self.input_shell.on_click = None
+            self.file_stage.alignment = ft.Alignment.CENTER
+            self.file_stage.on_click = self._browse
+            self.file_list.controls = [self.empty_drop_col]
 
         self._style_input_shell()
-        self._sync_view_buttons()
+        self._sync_drop_copy()
 
-    def _sync_view_buttons(self) -> None:
-        cards = self.file_view_mode == "cards"
-        self.view_cards_btn.disabled = cards
-        self.view_list_btn.disabled = not cards
+    def _active_index(self) -> int:
+        if not self.items:
+            return -1
+        for i, item in enumerate(self.items):
+            if item.id == self.active_id:
+                return i
+        return 0
+
+    def _select_index(self, index: int) -> None:
+        if not self.items:
+            return
+        index = max(0, min(index, len(self.items) - 1))
+        self.active_id = self.items[index].id
+        self._refresh_input_zone()
+        self._refresh_preview()
+        self.page.update()
+
+    def _on_keyboard(self, e: ft.KeyboardEvent) -> None:
+        # Only when main UI is showing and there are multiple files.
+        if self.shell.content is not self.root:
+            return
+        if len(self.items) < 2:
+            return
+        key = (e.key or "").replace(" ", "").lower()
+        idx = self._active_index()
+        if key in {"arrowdown", "down"}:
+            self._select_index(idx + 1)
+        elif key in {"arrowup", "up"}:
+            self._select_index(idx - 1)
 
     def _active(self) -> QueueItem | None:
         for item in self.items:
