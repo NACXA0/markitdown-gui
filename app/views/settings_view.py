@@ -13,6 +13,10 @@ from app.i18n import t
 from app.settings import AppSettings, save_settings, suggested_save_dir
 from app.theme import SCHEME_IDS, apply_theme, palette, scheme_is_dark, u
 
+GITHUB_URL = "https://github.com/NACXA0/markitdown-gui"
+ISSUES_URL = "https://github.com/NACXA0/markitdown-gui/issues"
+LICENSE_URL = "https://www.apache.org/licenses/LICENSE-2.0"
+
 
 def _btn(control: ft.Control, label: str) -> None:
     """设置按钮显示文字（Flet 使用 content）。
@@ -137,11 +141,35 @@ class SettingsPage:
         self.mcp_tool_text_box = ft.Container(padding=u(1.25), border_radius=u(1))
         self.mcp_tool_file_box = ft.Container(padding=u(1.25), border_radius=u(1))
 
+        self.about_title = ft.Text("", weight=ft.FontWeight.W_700)
+        self.about_slogan = ft.Text("", theme_style=ft.TextThemeStyle.BODY_MEDIUM)
+        self.about_license = ft.Text("", theme_style=ft.TextThemeStyle.BODY_MEDIUM)
+        self.about_repo_span = ft.TextSpan(
+            GITHUB_URL,
+            url=GITHUB_URL,
+            style=ft.TextStyle(decoration=ft.TextDecoration.UNDERLINE),
+        )
+        self.about_repo = ft.Text(
+            spans=[self.about_repo_span],
+            theme_style=ft.TextThemeStyle.BODY_SMALL,
+            selectable=True,
+        )
+        self.btn_github = ft.TextButton(
+            "", icon=ft.Icons.CODE, action=ft.OpenUrl(GITHUB_URL)
+        )
+        self.btn_issues = ft.TextButton(
+            "", icon=ft.Icons.BUG_REPORT, action=ft.OpenUrl(ISSUES_URL)
+        )
+        self.btn_license = ft.TextButton(
+            "", icon=ft.Icons.GAVEL, action=ft.OpenUrl(LICENSE_URL)
+        )
+
         self.general_card = self._card()
         self.export_card = self._card()
         self.convert_card = self._card()
         self.appearance_card = self._card()
         self.mcp_card = self._card()
+        self.about_card = self._card()
 
         self.body = ft.Column(
             [
@@ -150,6 +178,7 @@ class SettingsPage:
                 self.convert_card,
                 self.appearance_card,
                 self.mcp_card,
+                self.about_card,
             ],
             spacing=u(2.5),
             tight=True,
@@ -248,6 +277,23 @@ class SettingsPage:
             spacing=u(1.25),
             tight=True,
         )
+        self.about_card.content = ft.Column(
+            [
+                self.about_title,
+                ft.Divider(height=1),
+                self.about_slogan,
+                self.about_license,
+                self.about_repo,
+                ft.Row(
+                    [self.btn_github, self.btn_issues, self.btn_license],
+                    spacing=u(0.5),
+                    wrap=True,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+            ],
+            spacing=u(1.25),
+            tight=True,
+        )
 
     def _tr(self, key: str, **kwargs: Any) -> str:
         """当前语言翻译。
@@ -272,6 +318,7 @@ class SettingsPage:
             self.convert_title,
             self.appearance_title,
             self.mcp_title,
+            self.about_title,
         ):
             heading.color = c["ink"]
             heading.theme_style = ft.TextThemeStyle.TITLE_LARGE
@@ -285,6 +332,14 @@ class SettingsPage:
         self.mcp_tools_heading.color = c["ink"]
         self.mcp_tool_text.color = c["ink"]
         self.mcp_tool_file.color = c["ink"]
+        self.about_slogan.color = c["ink"]
+        self.about_license.color = c["muted"]
+        self.about_repo.color = c["accent"]
+        self.about_repo_span.style = ft.TextStyle(
+            color=c["accent"],
+            decoration=ft.TextDecoration.UNDERLINE,
+            decoration_color=c["accent"],
+        )
         self.mcp_status_box.bgcolor = c["paper"]
         self.mcp_status_box.border = ft.Border.all(1, c["line"])
         self.mcp_tool_text_box.bgcolor = c["paper"]
@@ -304,6 +359,7 @@ class SettingsPage:
             self.convert_card,
             self.appearance_card,
             self.mcp_card,
+            self.about_card,
         ):
             card.bgcolor = c["surface"]
             card.border = ft.Border.all(1.5, c["line"])
@@ -333,6 +389,12 @@ class SettingsPage:
         self.convert_title.value = self._tr("section_convert")
         self.appearance_title.value = self._tr("section_appearance")
         self.mcp_title.value = self._tr("section_mcp")
+        self.about_title.value = self._tr("section_about")
+        self.about_slogan.value = self._tr("about_slogan")
+        self.about_license.value = self._tr("about_license")
+        _btn(self.btn_github, self._tr("about_github"))
+        _btn(self.btn_issues, self._tr("about_issues"))
+        _btn(self.btn_license, self._tr("about_license_link"))
         self.lang_dd.label = self._tr("language")
         self.lang_dd.value = self.settings.language
         self.lang_dd.text = "简体中文" if self.settings.language == "zh" else "English"
