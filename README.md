@@ -4,11 +4,11 @@ Desktop GUI for [Microsoft MarkItDown](https://github.com/microsoft/markitdown),
 
 ## Features
 
-- Choose files and convert to Markdown (in-memory preview; export to save)
+- Choose files (path links; in-memory preview; export via system save dialog)
 - Convert modes: immediate / manual button / single-file compact UI
 - Batch queue, Markdown preview (source / rendered)
 - Export: Markdown, DOCX, HTML, PDF (via bundled Pandoc)
-- Settings: language (zh/en), save folder, dark mode, float ball, timestamp prefix, MCP
+- Settings: language (简体中文 / English), export start folder, color themes (light/dark built in), timestamp prefix, MCP
 - Local MCP at `http://127.0.0.1:12768/mcp` — tools `convert_to_text`, `convert_to_file`
 - **Primary package:** x86_64 AppImage（内含 `flet-dropzone`，支持系统文件拖放）
 
@@ -19,7 +19,7 @@ uv sync
 uv run python main.py
 ```
 
-开发时用官方轻量桌面客户端，**没有**编译进 `flet-dropzone`，左侧会显示红色 `Unknown control: flet_dropzone`，拖放不可用（仍可点击选文件）。要测拖放请用下方 AppImage。
+开发时用官方轻量桌面客户端，**没有**编译进 `flet-dropzone`，拖放不可用（仍可点击选文件）。要测拖放请用下方 AppImage。
 
 Optional reverse-export binary:
 
@@ -37,7 +37,7 @@ bash scripts/build-appimage.sh          # 用现有 build/linux；无则先 flet
 ./dist/appimage/MarkItDown_GUI-x86_64.AppImage
 ```
 
-把文件拖到主窗口**左侧区域**即可。`flet-dropzone` 就是做这件事的；它只在 **打包进自定义 Flutter 客户端** 的 AppImage / `flet build linux` 产物里生效。
+把文件拖到主窗口即可。`flet-dropzone` 就是做这件事的；它只在 **打包进自定义 Flutter 客户端** 的 AppImage / `flet build linux` 产物里生效。
 
 ## Install to application menu (Linux)
 

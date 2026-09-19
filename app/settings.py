@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Any, Literal
 
+from app.theme import SCHEME_IDS, scheme_is_dark
+
 ConvertMode = Literal[
     "drop_immediate",
     "manual_button",
@@ -26,12 +28,35 @@ def default_export_dir() -> Path:
     return path
 
 
+def _is_cache_exports(path: str) -> bool:
+    raw = (path or "").strip()
+    if not raw:
+        return False
+    try:
+        return Path(raw).expanduser().resolve() == (cache_root() / "exports").resolve()
+    except OSError:
+        return False
+
+
+def suggested_save_dir(settings: AppSettings) -> str:
+    """Folder to open in the system save dialog."""
+    raw = (settings.default_save_dir or "").strip()
+    if raw:
+        path = Path(raw).expanduser()
+        if path.is_dir():
+            return str(path)
+        if path.parent.is_dir():
+            return str(path.parent)
+    return str(default_export_dir())
+
+
 @dataclass
 class AppSettings:
     language: str = "zh"
     default_save_dir: str = ""
     convert_mode: ConvertMode = "drop_immediate"
     theme: ThemeMode = "light"
+    color_scheme: str = "sage"
     float_ball: bool = False
     timestamp_prefix: bool = False
     mcp_enabled: bool = False
@@ -46,11 +71,20 @@ class AppSettings:
     def from_dict(cls, data: dict[str, Any]) -> AppSettings:
         known = {f.name for f in fields(cls)}
         filtered = {k: v for k, v in data.items() if k in known}
+        if filtered.get("color_scheme") not in SCHEME_IDS:
+            filtered["color_scheme"] = "sage"
+        if filtered.get("theme") == "dark" and filtered.get("color_scheme") == "snow":
+            filtered["color_scheme"] = "ink"
+        filtered["theme"] = "dark" if scheme_is_dark(filtered.get("color_scheme")) else "light"
         return cls(**filtered)
 
     def resolved_save_dir(self) -> str:
-        if self.default_save_dir.strip():
-            return self.default_save_dir
+        """Headless fallback (MCP). Interactive export always uses a save dialog."""
+        raw = (self.default_save_dir or "").strip()
+        if raw and not _is_cache_exports(raw):
+            path = Path(raw).expanduser()
+            path.mkdir(parents=True, exist_ok=True)
+            return str(path)
         return str(default_export_dir())
 
 
@@ -70,16 +104,19 @@ def load_settings() -> AppSettings:
                 settings = AppSettings.from_dict(data)
         except (OSError, json.JSONDecodeError, TypeError, ValueError):
             settings = AppSettings()
-    if not settings.default_save_dir.strip():
+    raw = settings.default_save_dir.strip()
+    if not raw:
         settings.default_save_dir = str(default_export_dir())
     else:
-        Path(settings.default_save_dir).mkdir(parents=True, exist_ok=True)
+        try:
+            Path(raw).expanduser().mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+    settings.theme = "dark" if scheme_is_dark(settings.color_scheme) else "light"
     return settings
 
 
 def save_settings(settings: AppSettings) -> None:
-    if not settings.default_save_dir.strip():
-        settings.default_save_dir = str(default_export_dir())
     path = settings_path()
     path.write_text(
         json.dumps(settings.to_dict(), ensure_ascii=False, indent=2),
