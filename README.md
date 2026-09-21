@@ -10,32 +10,111 @@
 - 本地 MCP 服务地址：`[http://127.0.0.1:12768/mcp](http://127.0.0.1:12768/mcp)`，提供工具：`convert_to_text`、`convert_to_file`
 - **公开测试主包**：amd64 `.deb`（内置 `flet-dropzone`，支持系统文件拖放）。说明见 [RELEASE.md](RELEASE.md)
 
-## 开发
+## 从源码构建
+
+当前仓库只在 **Linux x86_64** 上能从源码打出可运行的客户端和安装包。只想改界面、看转换结果时，做到第 3 步即可；要测系统拖放或得到安装包，继续做到第 5 步及以后。
+
+### 1. 准备环境
+
+需要：
+
+- Linux x86_64（Debian、Ubuntu 及其衍生版）
+- Git、curl
+- [uv](https://docs.astral.sh/uv/)：按仓库里的 `.python-version` 安装 **Python 3.14**
+
+尚未安装 uv 时：
+
 ```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+编译带拖放的 Linux 客户端（第 5 步）前，还要装 GTK / Flutter 链接依赖。这组包与 [Flet Linux 打包文档](https://flet.dev/docs/publish/linux/) 一致：
+
+```bash
+sudo apt update
+sudo apt install -y \
+  binutils clang cmake llvm lld ninja-build pkg-config \
+  libgtk-3-dev libsecret-1-0 libsecret-1-dev libunwind-dev \
+  gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-libav \
+  gstreamer1.0-plugins-bad gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+  gstreamer1.0-plugins-ugly gstreamer1.0-pulseaudio gstreamer1.0-qt5 \
+  gstreamer1.0-tools gstreamer1.0-x \
+  libasound2-dev libgstreamer1.0-dev \
+  libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev \
+  libmpv-dev mpv
+```
+
+`lld` 必须存在，否则链接阶段会失败。首次 `flet build` 若本机没有匹配版本的 Flutter，会自动下载到 `$HOME/flutter/`，需要网络，耗时较长。打 deb 使用系统自带的 `dpkg-deb`。
+
+### 2. 获取代码并安装 Python 依赖
+
+```bash
+git clone https://github.com/NACXA0/markitdown-gui.git
+cd markitdown-gui
 uv sync
+```
+
+`uv sync` 会创建 `.venv`，并装上 Flet、MarkItDown 以及仓库内的 `vendor/flet-dropzone`。
+
+### 3. 开发模式运行
+
+```bash
 uv run python main.py
 ```
-开发环境使用官方轻量桌面客户端，**未编译打包 `flet-dropzone`，拖放功能不可用**（仍可点击选择文件）。如需测试拖放，请使用下文的 AppImage。
 
-可选：拉取反向导出所需二进制程序
+这一步用的是 Flet 官方轻量桌面客户端，**没有编译 `flet-dropzone`，从文件管理器拖放文件不可用**（仍可点击选择文件）。拖文件进窗口请用第 5 步之后的产物。
+
+### 4. 准备 Pandoc（导出 DOCX / HTML / PDF）
+
+反向导出依赖 Pandoc 二进制。打包脚本在缺失时会自动下载；开发模式不会，缺了会提示你先执行：
+
 ```bash
 bash scripts/fetch-pandoc.sh
 ```
 
-## 构建并运行支持拖放的 AppImage
+成功后二进制在 `bin/pandoc`（默认 3.6.4，可用环境变量 `PANDOC_VERSION` 指定版本）。Pandoc 为 GPL，再分发时需遵守其许可证。
+
+### 5. 编译带拖放的 Linux 客户端
+
 ```bash
-bash scripts/build-appimage.sh          # 使用已有的 build/linux；若无则先执行 flet build
-# 强制重新编译 Flutter：
+env -u ANDROID_HOME uv run flet build linux --skip-flutter-doctor
+bash scripts/run-linux.sh
+```
+
+产物在 `build/linux/markitdown-gui`。`scripts/run-linux.sh` 会启动这份发布包（找不到时会提示先完成上面的编译）。清掉 `ANDROID_HOME` 是为了避免本机 Android SDK 干扰 Flutter 的 Linux 构建。
+
+改过 Python 代码或 `vendor/flet-dropzone` 后，不要复用旧的 `build/linux`，按下面第 6 或第 7 步加上 `--rebuild`，或重新执行本步命令。
+
+### 6. 打 AppImage
+
+```bash
+bash scripts/build-appimage.sh
+# 已有 build/linux 但需要重编客户端时：
 # bash scripts/build-appimage.sh --rebuild
 ./dist/appimage/MarkItDown_GUI-x86_64.AppImage
 ```
-直接将文件拖入主窗口即可。`flet-dropzone` 负责实现该能力；该组件仅在**打包到自定义 Flutter 客户端**的 AppImage / `flet build linux` 产物中生效。
 
-## Linux：安装到应用程序菜单
+没有现成的 `build/linux` 时，脚本会先执行 `flet build linux`。`appimagetool` 不在 `PATH` 里时，脚本会下载到 `bin/appimagetool`。
+
+装进当前用户的应用程序菜单（不需要 root）：
+
 ```bash
 bash scripts/install-desktop.sh
 ```
-脚本会将 AppImage 安装至 `~/.local/share/markitdown-gui/`，同时创建桌面菜单项和 `markitdown-gui` 系统命令。
+
+脚本把 AppImage 复制到 `~/.local/share/markitdown-gui/`，并创建桌面菜单项和 `~/.local/bin/markitdown-gui`。请确认 `~/.local/bin` 在 `PATH` 中。
+
+### 7. 打 deb 并安装
+
+仅 **amd64**。版本号取自 `pyproject.toml` 的 `project.version`（当前为 `0.1.1`）：
+
+```bash
+bash scripts/build-deb.sh
+# bash scripts/build-deb.sh --rebuild
+sudo apt install ./dist/deb/markitdown-gui_0.1.1_amd64.deb
+```
+
+装好后从应用菜单启动，或在终端运行 `markitdown-gui`。程序在 `/opt/markitdown-gui`。
 
 ## Flet 1.0 / 文件拖放说明
 | 运行方式 | 客户端类型 | 系统文件拖放 |
@@ -43,14 +122,11 @@ bash scripts/install-desktop.sh
 | `uv run python main.py` | Flet 官方轻量桌面客户端 | 否 → 报错 `Unknown control: flet_dropzone` |
 | deb / AppImage / `flet build linux` | 内置 `flet-dropzone` + `desktop_drop` 的自编译客户端 | 是 |
 
-Flet 1.0 官方尚未内置「从资源管理器拖拽文件到应用窗口」的API；社区库 `flet-dropzone`（仓库路径 [`vendor/flet-dropzone`](vendor/flet-dropzone)）补充了这项能力，但该库必须随应用一同打包。
+Flet 1.0 官方尚未内置「从资源管理器拖拽文件到应用窗口」的 API；社区库 `flet-dropzone`（仓库路径 [`vendor/flet-dropzone`](vendor/flet-dropzone)）补充了这项能力，但该库必须随应用一同打包。
 
-## 打包
-```bash
-bash scripts/build-deb.sh               # 用现有 build/linux 打 amd64 deb
-# bash scripts/build-deb.sh --rebuild   # 先 flet build linux
-```
-产物：`dist/deb/markitdown-gui_0.1.0_amd64.deb`。
+## 各平台打包状态
+
+命令见上文「从源码构建」。各目标目前的情况：
 
 | 目标平台包 | 状态 |
 |--------|--------|

@@ -1,6 +1,6 @@
 [project]
 name = "markitdown-gui"
-version = "0.1.0"
+version = "0.1.1"
 description = "Desktop GUI for Microsoft MarkItDown, built with Flet"
 readme = "README.md"
 license = "Apache-2.0"

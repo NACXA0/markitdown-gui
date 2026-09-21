@@ -61,7 +61,7 @@ def _build_app() -> FastAPI:
         """
         return {
             "name": "markitdown-gui-mcp",
-            "version": "0.1.0",
+            "version": "0.1.1",
             "tools": ["convert_to_text", "convert_to_file"],
             "transport": "json-rpc-http",
             "note": "POST JSON-RPC to /mcp. Methods: tools/list, tools/call",
@@ -107,7 +107,7 @@ async def _dispatch(method: str, params: dict[str, Any]) -> Any:
         return {
             "protocolVersion": "2024-11-05",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "markitdown-gui", "version": "0.1.0"},
+            "serverInfo": {"name": "markitdown-gui", "version": "0.1.1"},
         }
     if method == "ping":
         return {}

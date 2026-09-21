@@ -121,10 +121,10 @@ Maintainer: nacxa <nacxa0@gmail.com>
 Installed-Size: $INSTALLED_KB
 Depends: libc6 (>= 2.35), libstdc++6, libgtk-3-0t64 | libgtk-3-0, libglib2.0-0t64 | libglib2.0-0
 Homepage: https://github.com/NACXA0/markitdown-gui
-Description: Desktop GUI for Microsoft MarkItDown (public preview 0.1)
+Description: Desktop GUI for Microsoft MarkItDown (public preview 0.1.1)
  Convert documents to Markdown, preview the result, and export Markdown,
  Word, HTML, or PDF. Includes a local MCP server for other AI clients.
- This 0.1 package is a public test build, not a stable release.
+ This 0.1.1 package is a public test build, not a stable release.
 EOF
 
 cat > "$STAGE/DEBIAN/postinst" << 'EOF'

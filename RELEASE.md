@@ -1,13 +1,20 @@
-# MarkItDown GUI 0.1
+# MarkItDown GUI 0.1.1
 
-**版本：** 0.1（包版本 `0.1.0`）   
-**日期：** 2026-09-19  
+**版本：** 0.1.1（包版本 `0.1.1`）  
+**日期：** 2026-09-21  
 **平台：** Linux x86_64（amd64）
 
 
 ## 这是什么
 
 MarkItDown GUI 是 [Microsoft MarkItDown](https://github.com/microsoft/markitdown) 的桌面前端。把 PDF、Office、图片等文件转成 Markdown，在窗口里预览，再导出成 Markdown、Word、HTML 或 PDF。
+
+## 本版更新
+
+相对 0.1.0：
+
+- 设置页底部增加了说明（关于本程序、许可证与仓库入口）
+- README 增加了从源码构建教程
 
 ## 本版包含
 
@@ -27,10 +34,10 @@ MarkItDown GUI 是 [Microsoft MarkItDown](https://github.com/microsoft/markitdow
 
 | 文件 | 说明 |
 |------|------|
-| `dist/deb/markitdown-gui_0.1.0_amd64.deb` | 本版主安装包（Debian / Ubuntu，amd64） |
+| `dist/deb/markitdown-gui_0.1.1_amd64.deb` | 本版主安装包（Debian / Ubuntu，amd64） |
 
 ```bash
-sudo apt install ./dist/deb/markitdown-gui_0.1.0_amd64.deb
+sudo apt install ./dist/deb/markitdown-gui_0.1.1_amd64.deb
 ```
 
 装好后可从应用菜单启动，或在终端运行 `markitdown-gui`。程序装在 `/opt/markitdown-gui`。
@@ -45,7 +52,7 @@ bash scripts/build-deb.sh
 
 ## 本版没有的包
 
-当前仓库**不能**打出下面这些包，本机环境也不具备交叉编译条件，所以 0.1 不提供：
+当前仓库**不能**打出下面这些包，本机环境也不具备交叉编译条件，所以 0.1.1 不提供：
 
 | 目标 | 原因 |
 |------|------|
