@@ -70,7 +70,8 @@ deb / AppImage **不支持交叉编译**：只能在目标架构的宿主机上 
 | 目标 | 原因 |
 |------|------|
 | 在 x86 上打 ARM Linux 包（或反过来） | 无交叉编译；须在对应架构机器上构建 |
-| Windows `.exe`（含 ARM Windows） | 没有打包脚本。`flet build windows` 只能在 Windows 上跑 |
+| Windows `.exe`（x64） | 有 `scripts/build-windows.cmd`，只能在 Windows 上跑。直连 GitHub 失败时脚本会先走镜像预取 |
+| ARM Windows `.exe` | 预构建运行时只有 Windows x64，没有 ARM 包 |
 | `.rpm` | 没有打包脚本，也没有 `rpmbuild` / `fpm` |
 | macOS `.app` | 占位，未实现。`flet build macos` 只能在 macOS 上跑 |
 

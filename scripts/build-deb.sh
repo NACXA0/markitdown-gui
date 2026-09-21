@@ -43,6 +43,8 @@ ensure_bundle() {
     fi
     echo "==> Existing Flutter bundle does not match host; rebuilding..."
   fi
+  echo "==> Prefetching Flet runtime (GitHub mirror if needed)..."
+  uv run python scripts/prefetch_flet_runtime.py
   echo "==> Building Linux release with flet build..."
   env -u ANDROID_HOME uv run flet build linux --skip-flutter-doctor
   BUNDLE="$ROOT/build/linux"

@@ -46,6 +46,14 @@ sudo apt install -y \
 
 `lld` 必须存在，否则链接阶段会失败。首次 `flet build` 若本机没有匹配版本的 Flutter，会自动下载到 `$HOME/flutter/`，需要网络，耗时较长。打 deb 使用系统自带的 `dpkg-deb`。
 
+直连 GitHub 超时时（Windows 上常见 `WinError 10060`，Linux 上常见 CMake `SSL connect error`），先把运行时放进 Flet 缓存。脚本会依次尝试 `ghfast.top`、`gh-proxy.com`，再回源 GitHub。缓存里已有文件时，Flet 和 CMake 不再下载：
+
+```bash
+uv run python scripts/prefetch_flet_runtime.py
+```
+
+Windows 上用 `scripts\build-windows.cmd`（内部会先预取再 `flet build windows`）。Flutter doctor 里 Android、Chrome、`maven.google.com` 的告警不影响 Linux 桌面打包。
+
 ### 2. 获取代码并安装 Python 依赖
 
 ```bash
@@ -141,8 +149,8 @@ Flet 1.0 官方尚未内置「从资源管理器拖拽文件到应用窗口」�
 | x86_64 AppImage | 在 x86_64 主机上：`scripts/build-appimage.sh` → `MarkItDown_GUI-x86_64.AppImage` |
 | aarch64 AppImage | 在 aarch64 主机上：同一脚本 → `MarkItDown_GUI-aarch64.AppImage`（不可交叉编译） |
 | rpm | 占位，未实现（无打包脚本，也无 rpmbuild） |
-| Windows exe | 占位，未实现（只能在 Windows 上 `flet build windows`；无本仓库打包脚本） |
-| ARM Windows exe | 占位，未实现（只能在 Windows 上 `flet build windows`） |
+| Windows exe | 在 Windows x64 上：`scripts\build-windows.cmd`（先预取 GitHub 依赖，再 `flet build windows`）。不能在 Linux 上交叉编译 |
+| ARM Windows exe | 占位，未实现（预构建的 dart_bridge / Python 运行时目前只有 Windows x64） |
 | macOS .app | 占位，未实现 |
 
 ## 许可证
