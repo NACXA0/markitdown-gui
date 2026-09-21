@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# 把 Flutter/Flet Linux 发布包打包成 x86_64 AppImage。
+# 把 Flutter/Flet Linux 发布包打成当前宿主架构的 AppImage（x86_64 或 aarch64）。
 # 优先使用已有构建（含 flet-dropzone）。除非传入 --rebuild，否则不会重新执行依赖网络的 `flet build`。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+
+# shellcheck source=linux-arch.sh
+source "$ROOT/scripts/linux-arch.sh"
+detect_linux_arch
 
 REBUILD=0
 if [[ "${1:-}" == "--rebuild" ]]; then
@@ -13,21 +17,30 @@ fi
 
 # 优先使用 Flet 1.0 `flet build linux` 输出；否则回退到 Flutter bundle 路径。
 BUNDLE="$ROOT/build/linux"
-FLUTTER_BUNDLE="$ROOT/build/flutter/build/linux/x64/release/bundle"
+FLUTTER_BUNDLE="$(flutter_linux_bundle_path "$ROOT")"
 OUT_DIR="$ROOT/dist/appimage"
-APPDIR="$OUT_DIR/MarkItDownGUI.AppDir"
-APPIMAGE="$OUT_DIR/MarkItDown_GUI-x86_64.AppImage"
-TOOL="$ROOT/bin/appimagetool"
+APPDIR="$OUT_DIR/MarkItDownGUI-${APPIMAGE_ARCH}.AppDir"
+APPIMAGE_NAME="$(appimage_basename)"
+APPIMAGE="$OUT_DIR/$APPIMAGE_NAME"
+TOOL="$ROOT/bin/appimagetool-${APPIMAGETOOL_ARCH}"
+
+echo "==> Host arch: $HOST_MACHINE → AppImage: $APPIMAGE_NAME"
 
 ensure_bundle() {
   if [[ -x "$BUNDLE/markitdown-gui" && "$REBUILD" -eq 0 ]]; then
-    echo "==> Using existing Linux bundle: $BUNDLE"
-    return
+    if verify_elf_arch "$BUNDLE/markitdown-gui"; then
+      echo "==> Using existing Linux bundle: $BUNDLE"
+      return
+    fi
+    echo "==> Existing $BUNDLE/markitdown-gui does not match host; rebuilding..."
   fi
   if [[ -x "$FLUTTER_BUNDLE/markitdown-gui" && "$REBUILD" -eq 0 ]]; then
-    BUNDLE="$FLUTTER_BUNDLE"
-    echo "==> Using existing Flutter Linux bundle: $BUNDLE"
-    return
+    if verify_elf_arch "$FLUTTER_BUNDLE/markitdown-gui"; then
+      BUNDLE="$FLUTTER_BUNDLE"
+      echo "==> Using existing Flutter Linux bundle: $BUNDLE"
+      return
+    fi
+    echo "==> Existing Flutter bundle does not match host; rebuilding..."
   fi
   echo "==> Building Linux release with flet build..."
   env -u ANDROID_HOME uv run flet build linux --skip-flutter-doctor
@@ -36,34 +49,51 @@ ensure_bundle() {
     echo "flet build linux did not produce $BUNDLE/markitdown-gui" >&2
     exit 1
   fi
+  verify_elf_arch "$BUNDLE/markitdown-gui"
 }
 
 ensure_appimagetool() {
   if command -v appimagetool >/dev/null 2>&1; then
-    TOOL="$(command -v appimagetool)"
+    local found
+    found="$(command -v appimagetool)"
+    if verify_elf_arch "$found"; then
+      TOOL="$found"
+      return
+    fi
+    echo "==> Ignoring PATH appimagetool (wrong arch): $found"
+  fi
+  if [[ -x "$TOOL" ]] && verify_elf_arch "$TOOL"; then
     return
   fi
-  if [[ -x "$TOOL" ]]; then
+  # 兼容旧路径 bin/appimagetool（仅当架构匹配时复用）
+  if [[ -x "$ROOT/bin/appimagetool" ]] && verify_elf_arch "$ROOT/bin/appimagetool"; then
+    TOOL="$ROOT/bin/appimagetool"
     return
   fi
-  echo "==> Fetching appimagetool..."
+  echo "==> Fetching appimagetool for $APPIMAGETOOL_ARCH..."
   mkdir -p "$ROOT/bin"
-  URL="https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+  URL="https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${APPIMAGETOOL_ARCH}.AppImage"
   MIRROR="https://ghfast.top/${URL}"
   if ! curl -L --fail --connect-timeout 30 --retry 5 -o "$TOOL" "$MIRROR"; then
     curl -L --fail --connect-timeout 30 --retry 5 -o "$TOOL" "$URL"
   fi
   chmod +x "$TOOL"
+  verify_elf_arch "$TOOL"
 }
 
 ensure_pandoc_in_bundle() {
   local dest="$BUNDLE/app/bin/pandoc"
-  if [[ -x "$dest" ]]; then
+  if [[ -x "$dest" ]] && verify_elf_arch "$dest"; then
     return
+  fi
+  if [[ -x "$ROOT/bin/pandoc" ]] && ! verify_elf_arch "$ROOT/bin/pandoc"; then
+    echo "==> Removing host-mismatched $ROOT/bin/pandoc"
+    rm -f "$ROOT/bin/pandoc"
   fi
   if [[ ! -x "$ROOT/bin/pandoc" ]]; then
     bash "$ROOT/scripts/fetch-pandoc.sh"
   fi
+  verify_elf_arch "$ROOT/bin/pandoc"
   mkdir -p "$BUNDLE/app/bin"
   cp -f "$ROOT/bin/pandoc" "$dest"
   chmod +x "$dest"
@@ -138,7 +168,7 @@ fi
 ensure_appimagetool
 mkdir -p "$OUT_DIR"
 echo "==> Building AppImage with $TOOL ..."
-ARCH=x86_64 "$TOOL" "$APPDIR" "$APPIMAGE"
+ARCH="$APPIMAGE_ARCH" "$TOOL" "$APPDIR" "$APPIMAGE"
 chmod +x "$APPIMAGE"
 echo "==> AppImage ready: $APPIMAGE"
 ls -lh "$APPIMAGE"

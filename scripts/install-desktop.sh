@@ -1,25 +1,33 @@
 #!/usr/bin/env bash
 # 把 MarkItDown GUI 的 AppImage 安装到用户应用菜单。
-# 主产物：dist/appimage/MarkItDown_GUI-x86_64.AppImage
+# 产物名按宿主架构区分：MarkItDown_GUI-x86_64.AppImage 或 MarkItDown_GUI-aarch64.AppImage
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APPIMAGE_SRC="$ROOT/dist/appimage/MarkItDown_GUI-x86_64.AppImage"
+
+# shellcheck source=linux-arch.sh
+source "$ROOT/scripts/linux-arch.sh"
+detect_linux_arch
+
+APPIMAGE_NAME="$(appimage_basename)"
+APPIMAGE_SRC="$ROOT/dist/appimage/$APPIMAGE_NAME"
 INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/markitdown-gui"
 BIN_DIR="${HOME}/.local/bin"
 APP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 ICON_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"
 ICON_DIR="$ICON_ROOT/256x256/apps"
 
+echo "==> Host arch: $HOST_MACHINE → install $APPIMAGE_NAME"
+
 if [[ ! -x "$APPIMAGE_SRC" ]]; then
-  echo "未找到 AppImage，正在构建…"
+  echo "未找到 $APPIMAGE_SRC，正在构建…"
   bash "$ROOT/scripts/build-appimage.sh"
 fi
 
 mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$APP_DIR" "$ICON_DIR"
-cp -f "$APPIMAGE_SRC" "$INSTALL_DIR/MarkItDown_GUI-x86_64.AppImage"
-chmod +x "$INSTALL_DIR/MarkItDown_GUI-x86_64.AppImage"
-ln -sfn "$INSTALL_DIR/MarkItDown_GUI-x86_64.AppImage" "$BIN_DIR/markitdown-gui"
+cp -f "$APPIMAGE_SRC" "$INSTALL_DIR/$APPIMAGE_NAME"
+chmod +x "$INSTALL_DIR/$APPIMAGE_NAME"
+ln -sfn "$INSTALL_DIR/$APPIMAGE_NAME" "$BIN_DIR/markitdown-gui"
 
 ICON_SRC=""
 for cand in \
@@ -60,7 +68,7 @@ if command -v gtk-update-icon-cache >/dev/null 2>&1; then
 fi
 
 echo "已安装 AppImage："
-echo "  AppImage → $INSTALL_DIR/MarkItDown_GUI-x86_64.AppImage"
+echo "  AppImage → $INSTALL_DIR/$APPIMAGE_NAME"
 echo "  命令     → $BIN_DIR/markitdown-gui"
 echo "  菜单项   → $APP_DIR/markitdown-gui.desktop"
 echo

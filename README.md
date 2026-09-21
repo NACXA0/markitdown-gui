@@ -12,13 +12,13 @@
 
 ## 从源码构建
 
-当前仓库只在 **Linux x86_64** 上能从源码打出可运行的客户端和安装包。只想改界面、看转换结果时，做到第 3 步即可；要测系统拖放或得到安装包，继续做到第 5 步及以后。
+在 **Linux x86_64（amd64）或 aarch64（arm64）** 本机上可从源码打出对应架构的客户端和安装包。脚本按 `uname -m` 自动选择架构，产物文件名里带架构后缀；**不支持交叉编译**（不能在 x86 机器上打出 ARM 包，反之亦然）。只想改界面、看转换结果时，做到第 3 步即可；要测系统拖放或得到安装包，继续做到第 5 步及以后。
 
 ### 1. 准备环境
 
 需要：
 
-- Linux x86_64（Debian、Ubuntu 及其衍生版）
+- Linux x86_64 或 aarch64（Debian、Ubuntu 及其衍生版）
 - Git、curl
 - [uv](https://docs.astral.sh/uv/)：按仓库里的 `.python-version` 安装 **Python 3.14**
 
@@ -91,10 +91,14 @@ bash scripts/run-linux.sh
 bash scripts/build-appimage.sh
 # 已有 build/linux 但需要重编客户端时：
 # bash scripts/build-appimage.sh --rebuild
-./dist/appimage/MarkItDown_GUI-x86_64.AppImage
 ```
 
-没有现成的 `build/linux` 时，脚本会先执行 `flet build linux`。`appimagetool` 不在 `PATH` 里时，脚本会下载到 `bin/appimagetool`。
+产物（二选一，取决于宿主）：
+
+- `dist/appimage/MarkItDown_GUI-x86_64.AppImage`
+- `dist/appimage/MarkItDown_GUI-aarch64.AppImage`
+
+没有现成的、且架构匹配的 `build/linux` 时，脚本会先执行 `flet build linux`。`appimagetool` 按架构下载到 `bin/appimagetool-x86_64` 或 `bin/appimagetool-aarch64`。
 
 装进当前用户的应用程序菜单（不需要 root）：
 
@@ -102,16 +106,18 @@ bash scripts/build-appimage.sh
 bash scripts/install-desktop.sh
 ```
 
-脚本把 AppImage 复制到 `~/.local/share/markitdown-gui/`，并创建桌面菜单项和 `~/.local/bin/markitdown-gui`。请确认 `~/.local/bin` 在 `PATH` 中。
+脚本安装与当前宿主架构对应的 AppImage 到 `~/.local/share/markitdown-gui/`，并创建桌面菜单项和 `~/.local/bin/markitdown-gui`。请确认 `~/.local/bin` 在 `PATH` 中。
 
 ### 7. 打 deb 并安装
 
-仅 **amd64**。版本号取自 `pyproject.toml` 的 `project.version`（当前为 `0.1.1`）：
+架构由宿主决定（`amd64` 或 `arm64`）。版本号取自 `pyproject.toml` 的 `project.version`（当前为 `0.1.1`）：
 
 ```bash
 bash scripts/build-deb.sh
 # bash scripts/build-deb.sh --rebuild
-sudo apt install ./dist/deb/markitdown-gui_0.1.1_amd64.deb
+# 例：sudo apt install ./dist/deb/markitdown-gui_0.1.1_amd64.deb
+# 或：sudo apt install ./dist/deb/markitdown-gui_0.1.1_arm64.deb
+sudo apt install ./dist/deb/markitdown-gui_0.1.1_*.deb
 ```
 
 装好后从应用菜单启动，或在终端运行 `markitdown-gui`。程序在 `/opt/markitdown-gui`。
@@ -130,12 +136,12 @@ Flet 1.0 官方尚未内置「从资源管理器拖拽文件到应用窗口」�
 
 | 目标平台包 | 状态 |
 |--------|--------|
-| amd64 deb | **0.1.1 已打出**（`dist/deb/markitdown-gui_0.1.1_amd64.deb`，`scripts/build-deb.sh`） |
-| ARM64 deb | 不能在本机 x86_64 上做。`flet build linux` 只编宿主架构，`--arch` 不作用于 Linux |
-| x86_64 AppImage | **0.1.1 已打出**（`dist/appimage/MarkItDown_GUI-x86_64.AppImage`，`scripts/build-appimage.sh`） |
-| ARM64 AppImage | 同 ARM64 deb：没有 ARM 二进制就无法打包 |
+| amd64 deb | 在 x86_64 主机上：`scripts/build-deb.sh` → `markitdown-gui_<ver>_amd64.deb` |
+| arm64 deb | 在 aarch64 主机上：同一脚本 → `markitdown-gui_<ver>_arm64.deb`（不可交叉编译） |
+| x86_64 AppImage | 在 x86_64 主机上：`scripts/build-appimage.sh` → `MarkItDown_GUI-x86_64.AppImage` |
+| aarch64 AppImage | 在 aarch64 主机上：同一脚本 → `MarkItDown_GUI-aarch64.AppImage`（不可交叉编译） |
 | rpm | 占位，未实现（无打包脚本，也无 rpmbuild） |
-| Windows exe | 占位，未实现（只能在 Windows 上 `flet build windows`） |
+| Windows exe | 占位，未实现（只能在 Windows 上 `flet build windows`；无本仓库打包脚本） |
 | ARM Windows exe | 占位，未实现（只能在 Windows 上 `flet build windows`） |
 | macOS .app | 占位，未实现 |
 

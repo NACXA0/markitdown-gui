@@ -15,6 +15,7 @@ MarkItDown GUI 是 [Microsoft MarkItDown](https://github.com/microsoft/markitdow
 
 - 设置页底部增加了说明（关于本程序、许可证与仓库入口）
 - README 增加了从源码构建教程
+- Linux 打包脚本按宿主架构自动选择（amd64 / arm64、x86_64 / aarch64），产物文件名带架构后缀；仍不支持交叉编译
 
 ## 本版包含
 
@@ -32,12 +33,14 @@ MarkItDown GUI 是 [Microsoft MarkItDown](https://github.com/microsoft/markitdow
 
 ## 安装包
 
-本版在 x86_64 开发机上实际打出的包：
+本版在 x86_64 开发机上实际打出的包（架构名写在文件名里）：
 
 | 文件 | 说明 |
 |------|------|
 | `dist/deb/markitdown-gui_0.1.1_amd64.deb` | 本版主安装包（Debian / Ubuntu，amd64，约 235 MB） |
 | `dist/appimage/MarkItDown_GUI-x86_64.AppImage` | 同一构建打出的 x86_64 AppImage（约 217 MB） |
+
+在 **aarch64** 机器上用同一套命令会得到 `markitdown-gui_0.1.1_arm64.deb` 与 `MarkItDown_GUI-aarch64.AppImage`。
 
 ```bash
 sudo apt install ./dist/deb/markitdown-gui_0.1.1_amd64.deb
@@ -51,7 +54,7 @@ AppImage 直接运行：
 ./dist/appimage/MarkItDown_GUI-x86_64.AppImage
 ```
 
-重新打包（已有 `build/linux` 时直接装包；要重编客户端时加 `--rebuild`）：
+重新打包（脚本自动按 `uname -m` 选架构；已有匹配的 `build/linux` 时直接装包，要重编客户端时加 `--rebuild`）：
 
 ```bash
 bash scripts/build-deb.sh
@@ -60,14 +63,14 @@ bash scripts/build-appimage.sh
 
 ## 本版没有的包
 
-ARM 的 deb 和 AppImage **不能在这台 x86_64 机器上制作**。`flet build linux` 只编译当前机器的架构；`--arch` 只对 macOS 和 Android 有效，不作用于 Linux。本机没有 aarch64 交叉编译器，也没有 qemu-user。打包脚本只是把已经编好的客户端装进 deb / AppImage，没有 ARM 二进制就打不出能在 ARM 上运行的包。把 deb 的 `Architecture` 改成 `arm64` 只会得到里面仍是 x86_64 程序的坏包。要出 ARM 包，需要在 ARM 机器（或 ARM 虚拟机）上执行同样的 `flet build linux`，再打包。
+deb / AppImage **不支持交叉编译**：只能在目标架构的宿主机上 `flet build linux` 再打包。`scripts/build-deb.sh` 与 `scripts/build-appimage.sh` 会检测宿主架构、校验二进制 `file` 输出，并把架构写进产物名；在 x86_64 上不会生成 arm64 包。
 
 当前仓库另外也不能打出：
 
 | 目标 | 原因 |
 |------|------|
-| ARM64 Linux deb / AppImage | 见上。x86_64 上不能交叉编译 |
-| Windows `.exe`（含 ARM Windows） | 没有打包脚本。`flet build windows` 只能在 Windows 上跑，这里是 Linux |
+| 在 x86 上打 ARM Linux 包（或反过来） | 无交叉编译；须在对应架构机器上构建 |
+| Windows `.exe`（含 ARM Windows） | 没有打包脚本。`flet build windows` 只能在 Windows 上跑 |
 | `.rpm` | 没有打包脚本，也没有 `rpmbuild` / `fpm` |
 | macOS `.app` | 占位，未实现。`flet build macos` 只能在 macOS 上跑 |
 
