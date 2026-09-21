@@ -130,11 +130,13 @@ Flet 1.0 官方尚未内置「从资源管理器拖拽文件到应用窗口」�
 
 | 目标平台包 | 状态 |
 |--------|--------|
-| amd64 deb | **公开测试主包**（`scripts/build-deb.sh`） |
-| x86_64 AppImage | 开发机可打（`scripts/build-appimage.sh`） |
-| ARM | 占位，未实现 |
+| amd64 deb | **0.1.1 已打出**（`dist/deb/markitdown-gui_0.1.1_amd64.deb`，`scripts/build-deb.sh`） |
+| ARM64 deb | 不能在本机 x86_64 上做。`flet build linux` 只编宿主架构，`--arch` 不作用于 Linux |
+| x86_64 AppImage | **0.1.1 已打出**（`dist/appimage/MarkItDown_GUI-x86_64.AppImage`，`scripts/build-appimage.sh`） |
+| ARM64 AppImage | 同 ARM64 deb：没有 ARM 二进制就无法打包 |
 | rpm | 占位，未实现（无打包脚本，也无 rpmbuild） |
 | Windows exe | 占位，未实现（只能在 Windows 上 `flet build windows`） |
+| ARM Windows exe | 占位，未实现（只能在 Windows 上 `flet build windows`） |
 | macOS .app | 占位，未实现 |
 
 ## 许可证

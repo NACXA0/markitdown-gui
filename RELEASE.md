@@ -32,9 +32,12 @@ MarkItDown GUI 是 [Microsoft MarkItDown](https://github.com/microsoft/markitdow
 
 ## 安装包
 
+本版在 x86_64 开发机上实际打出的包：
+
 | 文件 | 说明 |
 |------|------|
-| `dist/deb/markitdown-gui_0.1.1_amd64.deb` | 本版主安装包（Debian / Ubuntu，amd64） |
+| `dist/deb/markitdown-gui_0.1.1_amd64.deb` | 本版主安装包（Debian / Ubuntu，amd64，约 235 MB） |
+| `dist/appimage/MarkItDown_GUI-x86_64.AppImage` | 同一构建打出的 x86_64 AppImage（约 217 MB） |
 
 ```bash
 sudo apt install ./dist/deb/markitdown-gui_0.1.1_amd64.deb
@@ -42,26 +45,31 @@ sudo apt install ./dist/deb/markitdown-gui_0.1.1_amd64.deb
 
 装好后可从应用菜单启动，或在终端运行 `markitdown-gui`。程序装在 `/opt/markitdown-gui`。
 
-重新打包：
+AppImage 直接运行：
+
+```bash
+./dist/appimage/MarkItDown_GUI-x86_64.AppImage
+```
+
+重新打包（已有 `build/linux` 时直接装包；要重编客户端时加 `--rebuild`）：
 
 ```bash
 bash scripts/build-deb.sh
+bash scripts/build-appimage.sh
 ```
-
-已有 Linux 构建时直接打包；需要重编客户端时加 `--rebuild`。
 
 ## 本版没有的包
 
-当前仓库**不能**打出下面这些包，本机环境也不具备交叉编译条件，所以 0.1.1 不提供：
+ARM 的 deb 和 AppImage **不能在这台 x86_64 机器上制作**。`flet build linux` 只编译当前机器的架构；`--arch` 只对 macOS 和 Android 有效，不作用于 Linux。本机没有 aarch64 交叉编译器，也没有 qemu-user。打包脚本只是把已经编好的客户端装进 deb / AppImage，没有 ARM 二进制就打不出能在 ARM 上运行的包。把 deb 的 `Architecture` 改成 `arm64` 只会得到里面仍是 x86_64 程序的坏包。要出 ARM 包，需要在 ARM 机器（或 ARM 虚拟机）上执行同样的 `flet build linux`，再打包。
+
+当前仓库另外也不能打出：
 
 | 目标 | 原因 |
 |------|------|
-| Windows `.exe` | 没有打包脚本。`flet build windows` 只能在 Windows 上跑，这里是 Linux |
+| ARM64 Linux deb / AppImage | 见上。x86_64 上不能交叉编译 |
+| Windows `.exe`（含 ARM Windows） | 没有打包脚本。`flet build windows` 只能在 Windows 上跑，这里是 Linux |
 | `.rpm` | 没有打包脚本，也没有 `rpmbuild` / `fpm` |
-| ARM Linux | 占位，未实现 |
-| macOS `.app` | 占位，未实现 |
-
-x86_64 AppImage 仍可由 `scripts/build-appimage.sh` 在开发机上生成，但不是这次公开测试随包发布的安装介质。
+| macOS `.app` | 占位，未实现。`flet build macos` 只能在 macOS 上跑 |
 
 ## 已知限制
 
