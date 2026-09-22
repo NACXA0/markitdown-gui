@@ -44,8 +44,9 @@ ensure_bundle() {
   fi
   echo "==> Prefetching Flet runtime (GitHub mirror if needed)..."
   uv run python scripts/prefetch_flet_runtime.py
+  sanitize_flutter_pubspec_paths "$ROOT"
   echo "==> Building Linux release with flet build..."
-  env -u ANDROID_HOME uv run flet build linux --skip-flutter-doctor
+  flet_build_linux_env uv run flet build linux --skip-flutter-doctor
   BUNDLE="$ROOT/build/linux"
   if [[ ! -x "$BUNDLE/markitdown-gui" ]]; then
     echo "flet build linux did not produce $BUNDLE/markitdown-gui" >&2
@@ -169,8 +170,58 @@ fi
 
 ensure_appimagetool
 mkdir -p "$OUT_DIR"
+
+# appimagetool 在含非 ASCII 字符的路径下会报 Invalid byte sequence；
+# 把最终打包放到纯 ASCII 的 /tmp 暂存区再拷回。
+STAGE_ROOT="/tmp/markitdown-gui-appimage-${APPIMAGE_ARCH}"
+STAGE_APPDIR="$STAGE_ROOT/MarkItDownGUI-${APPIMAGE_ARCH}.AppDir"
+STAGE_OUT="$STAGE_ROOT/$APPIMAGE_NAME"
+rm -rf "$STAGE_ROOT"
+mkdir -p "$STAGE_ROOT"
+echo "==> Staging AppDir at $STAGE_APPDIR (ASCII path for appimagetool)"
+cp -a "$APPDIR" "$STAGE_APPDIR"
+
+RUNTIME_FILE=""
+for cand in \
+  "$ROOT/bin/runtime-${APPIMAGETOOL_ARCH}" \
+  "$ROOT/bin/runtime-x86_64" \
+  "$ROOT/bin/runtime-aarch64"
+do
+  if [[ -f "$cand" ]]; then
+    RUNTIME_FILE="$cand"
+    break
+  fi
+done
+
+# runtime 也拷到 ASCII 路径，避免 --runtime-file 踩中文路径
+STAGE_RUNTIME=""
+if [[ -n "$RUNTIME_FILE" ]]; then
+  STAGE_RUNTIME="$STAGE_ROOT/runtime-${APPIMAGETOOL_ARCH}"
+  cp -f "$RUNTIME_FILE" "$STAGE_RUNTIME"
+fi
+
 echo "==> Building AppImage with $TOOL ..."
-ARCH="$APPIMAGE_ARCH" "$TOOL" "$APPDIR" "$APPIMAGE"
+set +e
+if [[ -n "$STAGE_RUNTIME" ]]; then
+  echo "==> Using local runtime: $RUNTIME_FILE"
+  ARCH="$APPIMAGE_ARCH" "$TOOL" --runtime-file "$STAGE_RUNTIME" "$STAGE_APPDIR" "$STAGE_OUT"
+else
+  MIRROR_RUNTIME="https://ghfast.top/https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-${APPIMAGETOOL_ARCH}"
+  TMP_RUNTIME="$STAGE_ROOT/runtime-${APPIMAGETOOL_ARCH}"
+  if curl -L --fail --connect-timeout 30 --retry 5 -o "$TMP_RUNTIME" "$MIRROR_RUNTIME"; then
+    ARCH="$APPIMAGE_ARCH" "$TOOL" --runtime-file "$TMP_RUNTIME" "$STAGE_APPDIR" "$STAGE_OUT"
+  else
+    ARCH="$APPIMAGE_ARCH" "$TOOL" "$STAGE_APPDIR" "$STAGE_OUT"
+  fi
+fi
+APPIMAGE_RC=$?
+set -e
+if [[ $APPIMAGE_RC -ne 0 || ! -x "$STAGE_OUT" ]]; then
+  echo "AppImage 打包失败（exit=$APPIMAGE_RC）。可手动下载 runtime 到 bin/runtime-${APPIMAGETOOL_ARCH} 后重试。" >&2
+  exit 1
+fi
+cp -f "$STAGE_OUT" "$APPIMAGE"
 chmod +x "$APPIMAGE"
+rm -rf "$STAGE_ROOT"
 echo "==> AppImage ready: $APPIMAGE"
 ls -lh "$APPIMAGE"

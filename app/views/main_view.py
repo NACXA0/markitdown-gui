@@ -17,7 +17,7 @@ from app import converter, export_service, linux_file_dialog, mcp_server
 from app.i18n import t
 from app.settings import AppSettings, save_settings, suggested_save_dir
 from app.theme import apply_theme, scheme_is_dark, u
-from app.views.float_ball import stop_float_ball
+from app.views.float_ball import ensure_float_ball
 from app.views.settings_view import SettingsPage
 
 # 标签、填充色、圆角系数、图标
@@ -504,7 +504,7 @@ class MainApp:
         self._refresh_preview()
         if settings.mcp_enabled:
             mcp_server.apply_setting(settings)
-        stop_float_ball()
+        ensure_float_ball(settings.float_ball)
 
     def _on_page_resize(self, _e: ft.PageResizeEvent | None = None) -> None:
         """窗口尺寸变化时重算分栏宽度。
@@ -1678,6 +1678,7 @@ class MainApp:
             self._retranslate()
             self._refresh_workspace()
             self._refresh_preview()
+            ensure_float_ball(settings.float_ball)
             self.page.update()
 
         def on_back() -> None:

@@ -52,7 +52,7 @@ sudo apt install -y \
 uv run python scripts/prefetch_flet_runtime.py
 ```
 
-Windows 上用 `scripts\build-windows.cmd`（内部会先预取再 `flet build windows`）。Flutter doctor 里 Android、Chrome、`maven.google.com` 的告警不影响 Linux 桌面打包。
+Windows 上用 `scripts\build-windows.cmd`（内部会先预取再 `flet build windows`）。Flutter doctor 里 Android、Chrome、`maven.google.com` 的告警不影响 Linux 桌面打包——本产品只面向桌面，可忽略 Android toolchain。
 
 ### 2. 获取代码并安装 Python 依赖
 
@@ -85,11 +85,14 @@ bash scripts/fetch-pandoc.sh
 ### 5. 编译带拖放的 Linux 客户端
 
 ```bash
-env -u ANDROID_HOME uv run flet build linux --skip-flutter-doctor
+# 可选：若仓库曾在「桌面」等旧路径下构建过，先校正缓存里的绝对路径
+source scripts/linux-arch.sh && sanitize_flutter_pubspec_paths "$(pwd)"
+
+env -u ANDROID_HOME -u ANDROID_SDK_ROOT uv run flet build linux --skip-flutter-doctor
 bash scripts/run-linux.sh
 ```
 
-产物在 `build/linux/markitdown-gui`。`scripts/run-linux.sh` 会启动这份发布包（找不到时会提示先完成上面的编译）。清掉 `ANDROID_HOME` 是为了避免本机 Android SDK 干扰 Flutter 的 Linux 构建。
+产物在 `build/linux/markitdown-gui`。`scripts/run-linux.sh` 会启动这份发布包（找不到时会提示先完成上面的编译）。清掉 `ANDROID_HOME` / `ANDROID_SDK_ROOT` 并加 `--skip-flutter-doctor`，是为了跳过本机无关的 Android SDK 检查。
 
 改过 Python 代码或 `vendor/flet-dropzone` 后，不要复用旧的 `build/linux`，按下面第 6 或第 7 步加上 `--rebuild`，或重新执行本步命令。
 

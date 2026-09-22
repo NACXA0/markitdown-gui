@@ -37,7 +37,14 @@ def default_export_dir() -> Path:
     :return: 缓存目录下的 ``exports``
     """
     path = cache_root() / "exports"
-    path.mkdir(parents=True, exist_ok=True)
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+    except (OSError, UnicodeError):
+        path = Path.home() / ".cache" / "markitdown-gui" / "exports"
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except (OSError, UnicodeError):
+            pass
     return path
 
 
@@ -78,7 +85,7 @@ class AppSettings:
     :param convert_mode: 选择文件后如何触发转换
     :param theme: 由配色推导的浅/深色标记
     :param color_scheme: 配色方案 id
-    :param float_ball: 是否启用悬浮球（当前主窗口会关闭独立进程）
+    :param float_ball: 是否启用独立置顶悬浮球窗口
     :param timestamp_prefix: 导出文件名是否加时间戳
     :param mcp_enabled: 是否启动本机 MCP HTTP 服务
     :param mcp_port: MCP 监听端口
@@ -140,7 +147,10 @@ def settings_path() -> Path:
     :return: ``~/.config/markitdown-gui/settings.json``
     """
     base = Path.home() / ".config" / "markitdown-gui"
-    base.mkdir(parents=True, exist_ok=True)
+    try:
+        base.mkdir(parents=True, exist_ok=True)
+    except (OSError, UnicodeError):
+        pass
     return base / "settings.json"
 
 
@@ -164,7 +174,8 @@ def load_settings() -> AppSettings:
     else:
         try:
             Path(raw).expanduser().mkdir(parents=True, exist_ok=True)
-        except OSError:
+        except (OSError, UnicodeError):
+            # AppImage 子进程若 locale 为 ASCII，含中文路径的 mkdir 会抛 UnicodeEncodeError
             pass
     settings.theme = "dark" if scheme_is_dark(settings.color_scheme) else "light"
     return settings

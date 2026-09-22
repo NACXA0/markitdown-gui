@@ -64,3 +64,51 @@ deb_package_basename() {
 appimage_basename() {
   echo "MarkItDown_GUI-${APPIMAGE_ARCH}.AppImage"
 }
+
+# 桌面目录改名（如 桌面→Desktop）后，Flet 会把旧绝对路径写进
+# build/flutter/pubspec.yaml；此处按当前仓库根目录重写 path 依赖。
+sanitize_flutter_pubspec_paths() {
+  local root="${1:?}"
+  local pubspec="$root/build/flutter/pubspec.yaml"
+  local packages="$root/build/flutter-packages"
+  [[ -f "$pubspec" && -d "$packages" ]] || return 0
+  python3 - "$pubspec" "$packages" <<'PY'
+import pathlib, sys, re
+pubspec = pathlib.Path(sys.argv[1])
+packages = pathlib.Path(sys.argv[2]).resolve()
+text = pubspec.read_text(encoding="utf-8")
+# path: "/abs/.../flutter-packages/<name>" 或 Unicode 转义形式
+pat = re.compile(
+    r'(^\s+\w+:\s*\n\s+path:\s*)("(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\')',
+    re.M,
+)
+
+def repl(m: re.Match[str]) -> str:
+    raw = m.group(2)[1:-1]
+    try:
+        path = bytes(raw, "utf-8").decode("unicode_escape")
+    except Exception:
+        path = raw
+    p = pathlib.Path(path)
+    # 仅处理指向 flutter-packages 的本地 path 依赖
+    try:
+        name = p.name
+        candidate = packages / name
+        if candidate.is_dir() and (candidate / "pubspec.yaml").is_file():
+            if not p.exists() or p.resolve() != candidate.resolve():
+                return f'{m.group(1)}"{candidate.as_posix()}"'
+    except Exception:
+        pass
+    return m.group(0)
+
+new = pat.sub(repl, text)
+if new != text:
+    pubspec.write_text(new, encoding="utf-8")
+    print(f"==> Rewrote stale Flutter path deps in {pubspec}")
+PY
+}
+
+# 桌面打包不需要 Android SDK；清掉本机 ANDROID_* 以免 flutter doctor / 钩子误检。
+flet_build_linux_env() {
+  env -u ANDROID_HOME -u ANDROID_SDK_ROOT "$@"
+}

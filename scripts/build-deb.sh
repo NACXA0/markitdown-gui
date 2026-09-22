@@ -45,8 +45,9 @@ ensure_bundle() {
   fi
   echo "==> Prefetching Flet runtime (GitHub mirror if needed)..."
   uv run python scripts/prefetch_flet_runtime.py
+  sanitize_flutter_pubspec_paths "$ROOT"
   echo "==> Building Linux release with flet build..."
-  env -u ANDROID_HOME uv run flet build linux --skip-flutter-doctor
+  flet_build_linux_env uv run flet build linux --skip-flutter-doctor
   BUNDLE="$ROOT/build/linux"
   if [[ ! -x "$BUNDLE/markitdown-gui" ]]; then
     echo "flet build linux did not produce $BUNDLE/markitdown-gui" >&2

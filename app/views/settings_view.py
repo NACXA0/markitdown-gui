@@ -108,6 +108,15 @@ class SettingsPage:
         self.ts_sw = ft.Switch(
             value=settings.timestamp_prefix, on_change=self._on_timestamp
         )
+        self.float_sw = ft.Switch(
+            label=t(settings.language, "float_ball"),
+            value=settings.float_ball,
+            on_change=self._on_float_ball,
+        )
+        self.float_hint = ft.Text(
+            t(settings.language, "float_ball_hint"),
+            theme_style=ft.TextThemeStyle.BODY_SMALL,
+        )
 
         self.appearance_title = ft.Text("", weight=ft.FontWeight.W_700)
         self.scheme_hint = ft.Text("", theme_style=ft.TextThemeStyle.BODY_SMALL)
@@ -221,7 +230,14 @@ class SettingsPage:
         :return: None
         """
         self.general_card.content = ft.Column(
-            [self.general_title, ft.Divider(height=1), self.lang_dd],
+            [
+                self.general_title,
+                ft.Divider(height=1),
+                self.lang_dd,
+                ft.Divider(height=1),
+                self.float_sw,
+                self.float_hint,
+            ],
             spacing=u(1.25),
             tight=True,
         )
@@ -323,6 +339,7 @@ class SettingsPage:
             heading.color = c["ink"]
             heading.theme_style = ft.TextThemeStyle.TITLE_LARGE
         self.save_dir_hint.color = c["muted"]
+        self.float_hint.color = c["muted"]
         self.scheme_hint.color = c["muted"]
         self.mcp_desc.color = c["ink"]
         self.mcp_how.color = c["muted"]
@@ -398,6 +415,8 @@ class SettingsPage:
         self.lang_dd.label = self._tr("language")
         self.lang_dd.value = self.settings.language
         self.lang_dd.text = "简体中文" if self.settings.language == "zh" else "English"
+        self.float_sw.label = self._tr("float_ball")
+        self.float_hint.value = self._tr("float_ball_hint")
         self.save_dir_field.hint_text = self._tr("default_save_dir")
         self.save_dir_hint.value = self._tr("default_save_hint")
         _btn(self.btn_choose_folder, self._tr("choose_folder"))
@@ -570,6 +589,15 @@ class SettingsPage:
         :return: None
         """
         self.settings.timestamp_prefix = bool(e.control.value)
+        self._persist()
+
+    def _on_float_ball(self, e: ft.ControlEvent) -> None:
+        """开关置顶悬浮球窗口。
+
+        :param e: Switch 事件
+        :return: None
+        """
+        self.settings.float_ball = bool(e.control.value)
         self._persist()
 
     def _on_mcp(self, e: ft.ControlEvent) -> None:
