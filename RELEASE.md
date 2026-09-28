@@ -28,7 +28,7 @@ MarkItDown GUI 是 [Microsoft MarkItDown](https://github.com/microsoft/markitdow
 - 可选时间戳前缀、导出起始文件夹
 - 语言：简体中文 / English
 - 多套配色（各自带深浅）
-- 可选悬浮球：置顶小窗，拖入文件即转换
+- 可选悬浮窗：置顶小窗，拖入文件即转换
 - 本机 MCP（默认关闭），地址 `http://127.0.0.1:12768/mcp`，工具 `convert_to_text`、`convert_to_file`。只监听本机，不对外网开放
 
 ## 安装包

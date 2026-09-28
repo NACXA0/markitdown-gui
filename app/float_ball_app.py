@@ -1,4 +1,4 @@
-"""悬浮球窗口的模块入口，供 ``python -m app.float_ball_app`` 启动。"""
+"""悬浮窗窗口的模块入口，供 ``python -m app.float_ball_app`` 启动。"""
 
 import os
 import sys
@@ -16,7 +16,7 @@ from app.views.float_ball_ui import main as ball_main
 
 
 def _prefer_x11_backend() -> None:
-    """再次确认悬浮球使用 GDK X11 后端。
+    """再次确认悬浮窗使用 GDK X11 后端。
 
     :return: None
     """
@@ -33,7 +33,7 @@ def _prefer_x11_backend() -> None:
 
 
 def main(page: ft.Page) -> None:
-    """把页面交给悬浮球界面。
+    """把页面交给悬浮窗界面。
 
     :param page: Flet 页面
     :return: None
@@ -42,7 +42,7 @@ def main(page: ft.Page) -> None:
 
 
 def run() -> None:
-    """以桌面小窗方式运行悬浮球。
+    """以桌面小窗方式运行悬浮窗。
 
     :return: None
     """

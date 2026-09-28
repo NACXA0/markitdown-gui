@@ -85,12 +85,12 @@ class AppSettings:
     :param convert_mode: 选择文件后如何触发转换
     :param theme: 由配色推导的浅/深色标记
     :param color_scheme: 配色方案 id
-    :param float_ball: 是否启用独立置顶悬浮球窗口
+    :param float_ball: 是否启用独立置顶悬浮窗窗口
     :param timestamp_prefix: 导出文件名是否加时间戳
     :param mcp_enabled: 是否启动本机 MCP HTTP 服务
     :param mcp_port: MCP 监听端口
-    :param float_ball_x: 预留的悬浮球窗口 X 坐标
-    :param float_ball_y: 预留的悬浮球窗口 Y 坐标
+    :param float_ball_x: 预留的悬浮窗窗口 X 坐标
+    :param float_ball_y: 预留的悬浮窗窗口 Y 坐标
     """
 
     language: str = "zh"

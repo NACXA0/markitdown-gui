@@ -1,7 +1,9 @@
-"""屏幕探测与悬浮球响应式布局。
+"""屏幕探测与悬浮卡片响应式布局。
 
 优先相对短边 / 物理毫米；像素仅在窗口几何等不可避免处使用，
 并经 ``detect_screen`` 换算以适配不同分辨率与 DPI。
+
+卡片为圆角矩形，窗口与卡片等大（不透明、不裁圆）。
 """
 
 from __future__ import annotations
@@ -12,31 +14,30 @@ import subprocess
 from dataclasses import dataclass
 
 
-# —— 相对设计令牌（相对球径）；参考 1080p 上球径约 72px ——
+# —— 相对设计令牌（相对球径 unit）；参考 1080p 上 unit≈72px ——
 _BALL_MM = 13.0
 _BALL_OF_SHORT = 72 / 1080
 _BALL_MIN = 48.0
 _BALL_MAX = 128.0
-_RING_K = 14 / 9
-# 窗口尽量贴紧旋风外接方，仅额外留给复制键；缩小 Linux 不透明时的黑边
-_WIN_PAD_K = 0.35 / 9
-_PEEK_K = 1.25 / 9
-_COPY_W_K = 11 / 9
-_COPY_H_K = 4.5 / 9
-_EDGE_K = 3 / 9
-_GAP_K = 1.25 / 9
+# 空闲/展开：正方形边长 = ball；贴边半藏才收成窄矩形
+_CARD_K = 1.0
+_RADIUS_K = 0.22  # 内白面圆角（相对边长）
+# 旋风环：相对球径内缩
+_RING_INSET_K = 10 / 72
+_HIDE_K = 0.58  # 半藏窄条：够显示图标即可
+_COPY_W_K = 8.4 / 9  # 略增大复制键
+_COPY_H_K = 3.7 / 9
+_EDGE_K = 4 / 9  # 略放宽贴边吸附距离
+_GAP_K = 0.85 / 9  # 方卡与复制键间距
 _SIDE_GAP_K = 0.75 / 9
-_BORDER_K = 1 / 9
-_ICON_K = 3.75 / 9
+_BORDER_K = 0.95 / 9  # 更细外框，折叠时不挡内容
+_ICON_K = 4.0 / 9
 _X_ICON_K = 5.75 / 9
-_TEXT_SM_K = 1.375 / 9
-_TEXT_MD_K = 1.875 / 9
-_SPARK_R_K = 5.5 / 9
-_SPARK_DOT_K = 1.125 / 9
-_SHADOW_BLUR_K = 1.25 / 9
-_SHADOW_Y_K = 0.25 / 9
-_COPY_SHADOW_BLUR_K = 1 / 9
-_COPY_SHADOW_Y_K = 0.125 / 9
+_TEXT_SM_K = 1.45 / 9
+_TEXT_MD_K = 1.85 / 9  # 复制键文字略大
+_COPY_RADIUS_K = 0.28  # 相对复制键高度的圆角
+_SPARK_R_K = 6.5 / 9
+_SPARK_DOT_K = 1.25 / 9
 _PAD_K = 1 / 9
 SPARK_N = 12
 
@@ -83,13 +84,20 @@ class ScreenInfo:
 
 @dataclass(frozen=True)
 class BallLayout:
-    """悬浮球一套响应式尺寸（逻辑像素）。"""
+    """悬浮方卡一套响应式尺寸（逻辑像素）。
+
+    ``ball`` 为密度基准与方卡边长；``win_w`` / ``win_h`` 为完整展开（含下方复制键）尺寸。
+    ``hide_strip`` 为贴边半藏窄条厚度。
+    """
 
     win_w: float
     win_h: float
+    card_w: float
+    card_h: float
+    radius: float
     ball: float
     ring: float
-    peek: float
+    hide_strip: float
     copy_w: float
     copy_h: float
     ball_top: float
@@ -104,10 +112,6 @@ class BallLayout:
     spark_r: float
     spark_dot: float
     spark_half: float
-    shadow_blur: float
-    shadow_y: float
-    copy_shadow_blur: float
-    copy_shadow_y: float
     pad: float
     unit: float
     screen: ScreenInfo
@@ -132,35 +136,42 @@ class BallLayout:
             ball = _clamp(ppm * _BALL_MM, _BALL_MIN, _BALL_MAX)
         else:
             ball = _clamp(screen.short * _BALL_OF_SHORT, _BALL_MIN, _BALL_MAX)
-        # 极高缩放下逻辑坐标已放大时略收敛，避免球过大
         if screen.scale > 1.25:
             ball = _clamp(ball / (0.85 + 0.15 * screen.scale), _BALL_MIN, _BALL_MAX)
         unit = ball / 9.0
-        spark_dot = ball * _SPARK_DOT_K
-        ring = ball * _RING_K
-        pad = ball * _WIN_PAD_K
+        # 正方形卡片 = 原球径
+        card_w = ball * _CARD_K
+        card_h = ball * _CARD_K
+        radius = card_w * _RADIUS_K
+        inset = ball * _RING_INSET_K
+        ring = max(ball * 0.35, card_w - inset * 2)
+        hide_strip = max(ball * 0.35, card_w * _HIDE_K)
         copy_w = ball * _COPY_W_K
         copy_h = ball * _COPY_H_K
         gap = ball * _GAP_K
-        side_gap = ball * _SIDE_GAP_K
-        # 球在窗口上方居中；环略超出球，ball_top 刚好放下环
-        ball_top = (ring - ball) / 2 + pad
-        # 常态尽量贴紧环/下方复制键；侧向复制时由 UI 动态加宽
-        win_w = max(ring + pad * 2, copy_w + pad * 2)
-        win_h = ball_top + ball + gap + copy_h + pad
+        pad = ball * _PAD_K
+        border = max(unit * 0.75, ball * _BORDER_K)
+        # 完整窗口：方卡宽度；高度含下方突出复制键
+        win_w = card_w
+        win_h = card_h + gap + copy_h
+        ball_top = 0.0
+        spark_dot = ball * _SPARK_DOT_K
         return BallLayout(
             win_w=win_w,
             win_h=win_h,
+            card_w=card_w,
+            card_h=card_h,
+            radius=radius,
             ball=ball,
             ring=ring,
-            peek=ball * _PEEK_K,
+            hide_strip=hide_strip,
             copy_w=copy_w,
             copy_h=copy_h,
             ball_top=ball_top,
             edge=ball * _EDGE_K,
             gap=gap,
-            side_gap=side_gap,
-            border=max(1.0, ball * _BORDER_K),
+            side_gap=ball * _SIDE_GAP_K,
+            border=border,
             icon=ball * _ICON_K,
             x_icon=ball * _X_ICON_K,
             text_sm=ball * _TEXT_SM_K,
@@ -168,11 +179,7 @@ class BallLayout:
             spark_r=ball * _SPARK_R_K,
             spark_dot=spark_dot,
             spark_half=spark_dot / 2,
-            shadow_blur=ball * _SHADOW_BLUR_K,
-            shadow_y=ball * _SHADOW_Y_K,
-            copy_shadow_blur=ball * _COPY_SHADOW_BLUR_K,
-            copy_shadow_y=ball * _COPY_SHADOW_Y_K,
-            pad=ball * _PAD_K,
+            pad=pad,
             unit=unit,
             screen=screen,
         )

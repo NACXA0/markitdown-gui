@@ -1,10 +1,10 @@
 [project]
 name = "flet-dropzone"
-version = "0.4.0+flet1"
+version = "0.4.1"
 description = "Dropzone control for Flet (patched for Flet 1.0)"
 requires-python = ">=3.10"
 dependencies = [
-    "flet>=0.80.0",
+    "flet>=1.0.0,<1.1",
 ]
 
 [tool.setuptools]

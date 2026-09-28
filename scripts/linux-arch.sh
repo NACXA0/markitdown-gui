@@ -109,6 +109,12 @@ PY
 }
 
 # 桌面打包不需要 Android SDK；清掉本机 ANDROID_* 以免 flutter doctor / 钩子误检。
+# flet build 的 pip 步骤默认打 pypi.org；国内常遇 SSLEOF / 超时。
+# 未显式设置时改走阿里云镜像（可用 PIP_INDEX_URL / PIP_TRUSTED_HOST 覆盖）。
 flet_build_linux_env() {
-  env -u ANDROID_HOME -u ANDROID_SDK_ROOT "$@"
+  env -u ANDROID_HOME -u ANDROID_SDK_ROOT \
+    PIP_INDEX_URL="${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}" \
+    PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST:-mirrors.aliyun.com}" \
+    PIP_DEFAULT_TIMEOUT="${PIP_DEFAULT_TIMEOUT:-120}" \
+    "$@"
 }

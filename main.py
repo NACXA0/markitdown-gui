@@ -1,7 +1,7 @@
 """MarkItDown GUI 主窗口入口。
 
 启动 Flet 桌面窗口，加载本地设置并挂载主界面。
-打包环境下若设置 ``MARKITDOWN_FLOAT_BALL=1``，则改为启动悬浮球窗口。
+打包环境下若设置 ``MARKITDOWN_FLOAT_BALL=1``，则改为启动悬浮窗窗口。
 """
 
 import os
@@ -11,14 +11,14 @@ _FLOAT_ENV = "MARKITDOWN_FLOAT_BALL"
 
 
 def _want_float_ball() -> bool:
-    """是否应以悬浮球模式启动。
+    """是否应以悬浮窗模式启动。
 
     :return: 环境变量开启则为 True
     """
     return os.environ.get(_FLOAT_ENV, "").strip() in {"1", "true", "yes", "on"}
 
 
-# 打包二次启动悬浮球时，须在 import flet 前强制 X11。
+# 打包二次启动悬浮窗时，须在 import flet 前强制 X11。
 if _want_float_ball() and sys.platform.startswith("linux"):
     if os.environ.get("MARKITDOWN_FLOAT_BALL_WAYLAND", "").strip().lower() not in {
         "1",
@@ -35,7 +35,7 @@ from app.views.main_view import MainApp
 
 
 def main(page: ft.Page) -> None:
-    """初始化主窗口或悬浮球（打包二次启动时）。
+    """初始化主窗口或悬浮窗（打包二次启动时）。
 
     :param page: Flet 提供的应用页面对象
     :return: None

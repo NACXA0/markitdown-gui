@@ -1,8 +1,8 @@
-"""独立悬浮球进程的启停。
+"""独立悬浮窗进程的启停。
 
 开发环境：``python -m app.float_ball_app``。
 打包 / AppImage：再拉起同一可执行文件，并设 ``MARKITDOWN_FLOAT_BALL=1``，
-由 ``main.py`` 切到悬浮球界面（避免把 ``-m`` 参数交给 Flutter 客户端）。
+由 ``main.py`` 切到悬浮窗界面（避免把 ``-m`` 参数交给 Flutter 客户端）。
 """
 
 import os
@@ -30,7 +30,7 @@ def _pid_alive(pid: int) -> bool:
 
 
 def stop_float_ball() -> None:
-    """停止所有悬浮球进程（PID 文件 + 残留进程 + MD 窗口所属进程）。
+    """停止所有悬浮窗进程（PID 文件 + 残留进程 + MD 窗口所属进程）。
 
     :return: None
     """
@@ -124,17 +124,20 @@ def _is_python_launcher(executable: str) -> bool:
 
 
 def _launch_command() -> list[str]:
-    """构造启动悬浮球的命令行。
+    """构造启动悬浮窗的命令行。
+
+    AppImage / 打包二进制必须重入自身，才能带上 flet_dropzone 的 Flutter 扩展。
+    切勿在有 ``APPIMAGE`` 时仍走 ``python -m``（官方轻量客户端没有该控件）。
 
     :return: ``Popen`` 用的 argv
     """
-    if _is_python_launcher(sys.executable):
-        return [sys.executable, "-m", "app.float_ball_app"]
-    # AppImage：优先重入整个 AppImage，保证挂载与运行时完整
     appimage = (os.environ.get("APPIMAGE") or "").strip()
     if appimage and Path(appimage).is_file():
         return [appimage]
-    return [sys.executable]
+    # Flet 打包体：sys.executable 通常是 markitdown-gui，不是 python
+    if getattr(sys, "frozen", False) or not _is_python_launcher(sys.executable):
+        return [sys.executable]
+    return [sys.executable, "-m", "app.float_ball_app"]
 
 
 def _writable_cwd() -> Path:
@@ -148,7 +151,7 @@ def _writable_cwd() -> Path:
 
 
 def ensure_float_ball(enabled: bool) -> None:
-    """按开关启动或停止悬浮球窗口进程。
+    """按开关启动或停止悬浮窗窗口进程。
 
     :param enabled: True 则确保进程在跑；False 则停止
     :return: None
@@ -157,26 +160,39 @@ def ensure_float_ball(enabled: bool) -> None:
         stop_float_ball()
         return
 
-    # 先停掉全部残留，保证全局只有一个悬浮球
+    # 已在跑则不要 stop+restart——设置页每次 persist 都会回调到这里
+    if _PID_FILE.exists():
+        try:
+            existing = int(_PID_FILE.read_text(encoding="utf-8").strip())
+        except ValueError:
+            existing = 0
+        if existing > 1 and _pid_alive(existing):
+            return
+
+    # 先停掉全部残留，保证全局只有一个悬浮窗
     stop_float_ball()
 
     cwd = _writable_cwd()
     env = os.environ.copy()
-    # 去掉可能干扰二次启动的 Flet 内部变量
-    for key in (
-        "FLET_SERVER_UDS_PATH",
-        "FLET_SERVER_PORT",
-        "FLET_DART_BRIDGE_PORT",
-    ):
+    # 去掉父进程「flet run」会话变量，否则子进程只打印 PAGE_URL、不拉起独立 Flutter 窗
+    for key in list(env):
+        if not key.startswith("FLET_"):
+            continue
+        # 保留用户显式日志级别；其余会话/桥接/存储路径一律剥离
+        if key in {"FLET_LOG_LEVEL"}:
+            continue
         env.pop(key, None)
 
     cmd = _launch_command()
-    if not _is_python_launcher(cmd[0]):
+    # 只有「打包体 / AppImage 重入」才有 dropzone 扩展；python -m 必须关掉
+    via_module = len(cmd) >= 2 and cmd[1] == "-m"
+    if via_module:
+        env["MARKITDOWN_DROPZONE"] = "0"
+    else:
         env[_ENV_FLAG] = "1"
-    if os.environ.get("APPIMAGE") or getattr(sys, "frozen", False):
         env["MARKITDOWN_DROPZONE"] = "1"
 
-    # 悬浮球强制 X11：Wayland 下常出现超大黑底窗 + 无法贴边。
+    # 悬浮窗强制 X11：Wayland 下常出现超大黑底窗 + 无法贴边。
     if sys.platform.startswith("linux"):
         flag = (env.get("MARKITDOWN_FLOAT_BALL_WAYLAND") or "").strip().lower()
         if flag not in {"1", "true", "yes", "on"}:

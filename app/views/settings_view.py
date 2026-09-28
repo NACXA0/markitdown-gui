@@ -592,7 +592,7 @@ class SettingsPage:
         self._persist()
 
     def _on_float_ball(self, e: ft.ControlEvent) -> None:
-        """开关置顶悬浮球窗口。
+        """开关置顶悬浮窗窗口。
 
         :param e: Switch 事件
         :return: None

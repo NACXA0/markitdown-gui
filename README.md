@@ -88,11 +88,12 @@ bash scripts/fetch-pandoc.sh
 # 可选：若仓库曾在「桌面」等旧路径下构建过，先校正缓存里的绝对路径
 source scripts/linux-arch.sh && sanitize_flutter_pubspec_paths "$(pwd)"
 
-env -u ANDROID_HOME -u ANDROID_SDK_ROOT uv run flet build linux --skip-flutter-doctor
+# flet_build_linux_env：清 ANDROID_*，并对 pip 默认走阿里云镜像（规避 pypi.org SSLEOF）
+flet_build_linux_env uv run flet build linux --skip-flutter-doctor
 bash scripts/run-linux.sh
 ```
 
-产物在 `build/linux/markitdown-gui`。`scripts/run-linux.sh` 会启动这份发布包（找不到时会提示先完成上面的编译）。清掉 `ANDROID_HOME` / `ANDROID_SDK_ROOT` 并加 `--skip-flutter-doctor`，是为了跳过本机无关的 Android SDK 检查。
+产物在 `build/linux/markitdown-gui`。`scripts/run-linux.sh` 会启动这份发布包（找不到时会提示先完成上面的编译）。清掉 `ANDROID_HOME` / `ANDROID_SDK_ROOT` 并加 `--skip-flutter-doctor`，是为了跳过本机无关的 Android SDK 检查。`flet build` 安装 Python 依赖时若直连 PyPI 失败，可用 `PIP_INDEX_URL` / `PIP_TRUSTED_HOST` 覆盖默认镜像。
 
 改过 Python 代码或 `vendor/flet-dropzone` 后，不要复用旧的 `build/linux`，按下面第 6 或第 7 步加上 `--rebuild`，或重新执行本步命令。
 

@@ -6,7 +6,9 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.14"
 dependencies = [
-    "flet[all]>=1.0.0",
+    # 打包进 AppImage/deb 的依赖：不要写 flet[all]，否则会把 flet-desktop/web
+    # 一并装进 site-packages，易与 flet 1.0.x 精确钉版本冲突。
+    "flet>=1.0.0,<1.1",
     "markitdown[pdf,docx,pptx,xlsx,xls,outlook,audio-transcription,youtube-transcription]>=0.1.3",
     "youtube-transcript-api>=1.2.3",
     "fastapi>=0.115",
@@ -19,11 +21,14 @@ markitdown-gui = "main:main"
 
 [dependency-groups]
 dev = [
+    # 本地 flet run / CLI 需要桌面客户端
+    "flet[all]>=1.0.0,<1.1",
     "pyinstaller>=6.0",
 ]
 
 [tool.uv]
 package = false
+default-groups = ["dev"]
 
 [tool.uv.sources]
 flet-dropzone = { path = "vendor/flet-dropzone" }
