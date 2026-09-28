@@ -1,5 +1,16 @@
-# MarkItDown GUI（基于 Flet）
-[Microsoft MarkItDown](https://github.com/microsoft/markitdown) 的桌面图形界面，采用 **Flet 1.0** + Python 3.14（`uv`）构建。
+# MD文件格式转换器（MarkItDown GUI）
+
+## 可视化地！将Word、PDF等**相当多**种格式的文件格式转换为MarkDown。
+### 并且可以反向转换！批量转换！鼠标一键拖拽转换...好简单呦！
+### 竟然还有AI用的MCP！！！纳岂不是人和AI都可以用这个！
+
+### 主界面
+![主界面](./assets/window.png)
+### 悬浮窗
+![悬浮窗](./assets/float-window.png)
+
+
+### 基于[Microsoft MarkItDown](https://github.com/microsoft/markitdown) 的桌面图形界面，采用 **Flet 1.0** + Python 3.14（`uv`）构建。
 
 ## 功能特性
 - 文件选择（支持路径链接；内存内预览；通过系统保存对话框导出）
@@ -122,14 +133,14 @@ bash scripts/install-desktop.sh
 
 ### 7. 打 deb 并安装
 
-架构由宿主决定（`amd64` 或 `arm64`）。版本号取自 `pyproject.toml` 的 `project.version`（当前为 `0.1.1`）：
+架构由宿主决定（`amd64` 或 `arm64`）。版本号取自 `pyproject.toml` 的 `project.version`（当前为 `0.2.0`）：
 
 ```bash
 bash scripts/build-deb.sh
 # bash scripts/build-deb.sh --rebuild
-# 例：sudo apt install ./dist/deb/markitdown-gui_0.1.1_amd64.deb
-# 或：sudo apt install ./dist/deb/markitdown-gui_0.1.1_arm64.deb
-sudo apt install ./dist/deb/markitdown-gui_0.1.1_*.deb
+# 例：sudo apt install ./dist/deb/markitdown-gui_0.2.0_amd64.deb
+# 或：sudo apt install ./dist/deb/markitdown-gui_0.2.0_arm64.deb
+sudo apt install ./dist/deb/markitdown-gui_0.2.0_*.deb
 ```
 
 装好后从应用菜单启动，或在终端运行 `markitdown-gui`。程序在 `/opt/markitdown-gui`。
