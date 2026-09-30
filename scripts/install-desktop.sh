@@ -30,18 +30,22 @@ chmod +x "$INSTALL_DIR/$APPIMAGE_NAME"
 ln -sfn "$INSTALL_DIR/$APPIMAGE_NAME" "$BIN_DIR/markitdown-gui"
 
 ICON_SRC=""
-for cand in \
-  "$ROOT/assets/icon.png" \
-  "$ROOT/build/linux/share/icons/hicolor/256x256/apps/com.flet.markitdown-gui.png" \
-  "$ROOT/build/flutter/images/icon.png"
-do
-  if [[ -f "$cand" ]]; then
-    ICON_SRC="$cand"
-    break
+# 优先用 assets/icon.ico（栅格化为 PNG）；否则回退到已有构建产物。
+if [[ -f "$ROOT/assets/icon.ico" ]]; then
+  uv run python -c "from PIL import Image; Image.open(r'$ROOT/assets/icon.ico').convert('RGBA').save(r'$ICON_DIR/markitdown-gui.png')"
+else
+  for cand in \
+    "$ROOT/build/linux/share/icons/hicolor/256x256/apps/com.flet.markitdown-gui.png" \
+    "$ROOT/build/flutter/images/icon.png"
+  do
+    if [[ -f "$cand" ]]; then
+      ICON_SRC="$cand"
+      break
+    fi
+  done
+  if [[ -n "$ICON_SRC" ]]; then
+    cp -f "$ICON_SRC" "$ICON_DIR/markitdown-gui.png"
   fi
-done
-if [[ -n "$ICON_SRC" ]]; then
-  cp -f "$ICON_SRC" "$ICON_DIR/markitdown-gui.png"
 fi
 
 cat > "$APP_DIR/markitdown-gui.desktop" << EOF

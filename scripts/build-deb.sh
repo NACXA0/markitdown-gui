@@ -119,9 +119,10 @@ for png in "$BUNDLE"/share/icons/hicolor/*/apps/com.flet.markitdown-gui.png; do
 done
 shopt -u nullglob
 
-if [[ ! -f "$STAGE/usr/share/icons/hicolor/256x256/apps/com.flet.markitdown-gui.png" && -f "$ROOT/assets/icon.png" ]]; then
+# assets/icon.ico 覆盖为正式桌面图标（flet 在 Linux 上不读 .ico）。
+if [[ -f "$ROOT/assets/icon.ico" ]]; then
   mkdir -p "$STAGE/usr/share/icons/hicolor/256x256/apps"
-  cp -f "$ROOT/assets/icon.png" "$STAGE/usr/share/icons/hicolor/256x256/apps/com.flet.markitdown-gui.png"
+  uv run python -c "from PIL import Image; Image.open(r'$ROOT/assets/icon.ico').convert('RGBA').save(r'$STAGE/usr/share/icons/hicolor/256x256/apps/com.flet.markitdown-gui.png')"
 fi
 
 INSTALLED_KB="$(du -sk "$STAGE" --exclude=DEBIAN | awk '{print $1}')"

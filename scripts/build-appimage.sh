@@ -144,28 +144,35 @@ EOF
 cp -f "$APPDIR/markitdown-gui.desktop" "$APPDIR/usr/share/applications/"
 
 DESKTOP_ID="com.flet.markitdown-gui"
+ICON_DST="$APPDIR/markitdown-gui.png"
 ICON_SRC=""
-for cand in \
-  "$BUNDLE/share/icons/hicolor/256x256/apps/${DESKTOP_ID}.png" \
-  "$ROOT/assets/icon.png" \
-  "$ROOT/build/flutter/images/icon.png" \
-  "$BUNDLE/data/flutter_assets/images/icon.png" \
-  "$BUNDLE/data/app_icon.png"
-do
-  if [[ -f "$cand" ]]; then
-    ICON_SRC="$cand"
-    break
-  fi
-done
-if [[ -n "$ICON_SRC" ]]; then
-  cp -f "$ICON_SRC" "$APPDIR/markitdown-gui.png"
-  cp -f "$ICON_SRC" "$APPDIR/usr/share/icons/hicolor/256x256/apps/markitdown-gui.png"
+# 优先用 assets/icon.ico（栅格化为 PNG）；否则回退到已有构建产物。
+if [[ -f "$ROOT/assets/icon.ico" ]]; then
+  uv run python -c "from PIL import Image; Image.open(r'$ROOT/assets/icon.ico').convert('RGBA').save(r'$ICON_DST')"
+  cp -f "$ICON_DST" "$APPDIR/usr/share/icons/hicolor/256x256/apps/markitdown-gui.png"
   ln -sfn "markitdown-gui.png" "$APPDIR/.DirIcon"
 else
-  # 最小合法 1x1 PNG，让 appimagetool 接受该 AppDir。
-  printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' \
-    > "$APPDIR/markitdown-gui.png"
-  ln -sfn "markitdown-gui.png" "$APPDIR/.DirIcon"
+  for cand in \
+    "$BUNDLE/share/icons/hicolor/256x256/apps/${DESKTOP_ID}.png" \
+    "$ROOT/build/flutter/images/icon.png" \
+    "$BUNDLE/data/flutter_assets/images/icon.png" \
+    "$BUNDLE/data/app_icon.png"
+  do
+    if [[ -f "$cand" ]]; then
+      ICON_SRC="$cand"
+      break
+    fi
+  done
+  if [[ -n "$ICON_SRC" ]]; then
+    cp -f "$ICON_SRC" "$ICON_DST"
+    cp -f "$ICON_SRC" "$APPDIR/usr/share/icons/hicolor/256x256/apps/markitdown-gui.png"
+    ln -sfn "markitdown-gui.png" "$APPDIR/.DirIcon"
+  else
+    # 最小合法 1x1 PNG，让 appimagetool 接受该 AppDir。
+    printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' \
+      > "$ICON_DST"
+    ln -sfn "markitdown-gui.png" "$APPDIR/.DirIcon"
+  fi
 fi
 
 ensure_appimagetool

@@ -43,11 +43,16 @@ def _project_root() -> Path:
 def find_pandoc() -> Path | None:
     """查找捆绑或系统 PATH 中的 pandoc 可执行文件。
 
+    打包体里二进制在 ``bin/``（Linux 为 ``pandoc``，Windows 为 ``pandoc.exe``）。
+    只检查文件是否存在；Windows 上可执行位不可靠。
+
     :return: pandoc 路径；找不到时为 None
     """
-    bundled = _project_root() / "bin" / "pandoc"
-    if bundled.is_file() and bundled.stat().st_mode & 0o111:
-        return bundled
+    bin_dir = _project_root() / "bin"
+    for name in ("pandoc.exe", "pandoc"):
+        candidate = bin_dir / name
+        if candidate.is_file():
+            return candidate
     which = shutil.which("pandoc")
     return Path(which) if which else None
 

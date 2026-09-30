@@ -23,13 +23,13 @@
 
 ## 从源码构建
 
-在 **Linux x86_64（amd64）或 aarch64（arm64）** 本机上可从源码打出对应架构的客户端和安装包。脚本按 `uname -m` 自动选择架构，产物文件名里带架构后缀；**不支持交叉编译**（不能在 x86 机器上打出 ARM 包，反之亦然）。只想改界面、看转换结果时，做到第 3 步即可；要测系统拖放或得到安装包，继续做到第 5 步及以后。
+在 **Linux x86_64（amd64）或 aarch64（arm64）**，或 **Windows x64** 本机上可从源码打出对应平台的客户端和安装包。Linux 脚本按 `uname -m` 自动选择架构，产物文件名里带架构后缀；**不支持交叉编译**（不能在 x86 上打出 ARM 包，也不能在 Linux 上打出 Windows 包，反之亦然）。只想改界面、看转换结果时，做到第 3 步即可；要测系统拖放或得到安装包，Linux 继续做到第 5 步及以后，Windows 见第 8 步。
 
 ### 1. 准备环境
 
 需要：
 
-- Linux x86_64 或 aarch64（Debian、Ubuntu 及其衍生版）
+- Linux x86_64 或 aarch64（Debian、Ubuntu 及其衍生版），或 Windows x64
 - Git、curl
 - [uv](https://docs.astral.sh/uv/)：按仓库里的 `.python-version` 安装 **Python 3.14**
 
@@ -57,14 +57,19 @@ sudo apt install -y \
 
 `lld` 必须存在，否则链接阶段会失败。首次 `flet build` 若本机没有匹配版本的 Flutter，会自动下载到 `$HOME/flutter/`，需要网络，耗时较长。打 deb 使用系统自带的 `dpkg-deb`。
 
+Windows 打包（第 8 步）另需：
+
+- Visual Studio 2022 或更新版本，并勾选工作负载 **使用 C++ 的桌面开发**
+- 系统 **开发者模式**（`flet build` 需要符号链接支持；设置里打开，或运行 `start ms-settings:developers`）
+- [Inno Setup 6](https://jrsoftware.org/isinfo.php)：`winget install JRSoftware.InnoSetup`
+
 直连 GitHub 超时时（Windows 上常见 `WinError 10060`，Linux 上常见 CMake `SSL connect error`），先把运行时放进 Flet 缓存。脚本会依次尝试 `ghfast.top`、`gh-proxy.com`，再回源 GitHub。缓存里已有文件时，Flet 和 CMake 不再下载：
 
 ```bash
 uv run python scripts/prefetch_flet_runtime.py
 ```
 
-Windows 上用 `scripts\build-windows.cmd`（内部会先预取再 `flet build windows`）。Flutter doctor 里 Android、Chrome、`maven.google.com` 的告警不影响 Linux 桌面打包——本产品只面向桌面，可忽略 Android toolchain。
-
+Flutter doctor 里 Android、Chrome、`maven.google.com` 的告警不影响桌面打包——本产品只面向桌面，可忽略 Android toolchain。
 ### 2. 获取代码并安装 Python 依赖
 
 ```bash
@@ -145,11 +150,42 @@ sudo apt install ./dist/deb/markitdown-gui_0.2.0_*.deb
 
 装好后从应用菜单启动，或在终端运行 `markitdown-gui`。程序在 `/opt/markitdown-gui`。
 
+### 8. 打 Windows 安装包（仅 Windows x64）
+
+必须在 **Windows x64** 本机执行（不能在 Linux 上交叉编译）。环境见第 1 步「Windows 打包另需」。
+
+```bat
+scripts\build-windows-setup.cmd
+REM 已有 build\windows 但需要重编客户端时：
+REM scripts\build-windows-setup.cmd --rebuild
+```
+
+脚本会：
+
+1. 若缺少 `build\windows\markitdown-gui.exe`（或传入 `--rebuild`），先跑 `scripts\build-windows.cmd`（预取 GitHub 依赖 → `flet build windows`）
+2. 把官方 Pandoc 放进 `build\windows\app\bin\pandoc.exe`（缺失时下载）
+3. 用 Inno Setup 6 打出安装包
+
+产物：
+
+- `dist\windows\MarkItDown_GUI-<version>-x64-setup.exe`（版本号取自 `pyproject.toml`，当前为 `0.2.0`）
+
+`flet build windows` 的中间产物是目录 `build\windows`（exe 与全部插件 DLL、`data\` 必须同目录），**不能只拷贝单个 exe**。安装包会把该目录装到「Program Files\MarkItDown GUI」，并创建开始菜单快捷方式。安装后从开始菜单启动即可。
+
+只想得到可运行目录、不要安装包时：
+
+```bat
+scripts\build-windows.cmd
+```
+
+然后在 `build\windows` 里运行 `markitdown-gui.exe`。
+
 ## Flet 1.0 / 文件拖放说明
 | 运行方式 | 客户端类型 | 系统文件拖放 |
 |----------|--------|---------|
 | `uv run python main.py` | Flet 官方轻量桌面客户端 | 否 → 报错 `Unknown control: flet_dropzone` |
 | deb / AppImage / `flet build linux` | 内置 `flet-dropzone` + `desktop_drop` 的自编译客户端 | 是 |
+| Windows 安装包 / `flet build windows` | 同上（自编译客户端） | 是 |
 
 Flet 1.0 官方尚未内置「从资源管理器拖拽文件到应用窗口」的 API；社区库 `flet-dropzone`（仓库路径 [`vendor/flet-dropzone`](vendor/flet-dropzone)）补充了这项能力，但该库必须随应用一同打包。
 
@@ -164,9 +200,8 @@ Flet 1.0 官方尚未内置「从资源管理器拖拽文件到应用窗口」�
 | x86_64 AppImage | 在 x86_64 主机上：`scripts/build-appimage.sh` → `MarkItDown_GUI-x86_64.AppImage` |
 | aarch64 AppImage | 在 aarch64 主机上：同一脚本 → `MarkItDown_GUI-aarch64.AppImage`（不可交叉编译） |
 | rpm | 占位，未实现（无打包脚本，也无 rpmbuild） |
-| Windows exe | 在 Windows x64 上：`scripts\build-windows.cmd`（先预取 GitHub 依赖，再 `flet build windows`）。不能在 Linux 上交叉编译 |
-| ARM Windows exe | 占位，未实现（预构建的 dart_bridge / Python 运行时目前只有 Windows x64） |
+| Windows x64 安装包 | 在 Windows x64 上：`scripts\build-windows-setup.cmd` → `dist\windows\MarkItDown_GUI-<ver>-x64-setup.exe`（中间目录由 `build-windows.cmd` / `flet build windows` 生成）。不能在 Linux 上交叉编译 |
+| ARM Windows | 占位，未实现（预构建的 dart_bridge / Python 运行时目前只有 Windows x64） |
 | macOS .app | 占位，未实现 |
-
 ## 许可证
 本图形界面采用 Apache License 2.0（见仓库根目录 `LICENSE`）。MarkItDown 为微软 MIT 协议。Pandoc 使用 GPL 协议——重新分发时请查阅其许可证。

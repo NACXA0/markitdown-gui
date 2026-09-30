@@ -51,6 +51,7 @@ def main(page: ft.Page) -> None:
     page.window.height = 760
     page.window.min_width = 800
     page.window.min_height = 560
+    page.window.icon = "icon.ico"
     page.padding = 0
     page.spacing = 0
 
