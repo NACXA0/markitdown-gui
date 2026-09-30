@@ -61,7 +61,7 @@ Windows 打包（第 8 步）另需：
 
 - Visual Studio 2022 或更新版本，并勾选工作负载 **使用 C++ 的桌面开发**
 - 系统 **开发者模式**（`flet build` 需要符号链接支持；设置里打开，或运行 `start ms-settings:developers`）
-- [Inno Setup 6](https://jrsoftware.org/isinfo.php)：`winget install JRSoftware.InnoSetup`
+- [Inno Setup 6](https://jrsoftware.org/isinfo.php)：可先手动安装，或在打安装包时由脚本用 `winget install JRSoftware.InnoSetup` 自动安装（需本机已有 winget）
 
 直连 GitHub 超时时（Windows 上常见 `WinError 10060`，Linux 上常见 CMake `SSL connect error`），先把运行时放进 Flet 缓存。脚本会依次尝试 `ghfast.top`、`gh-proxy.com`，再回源 GitHub。缓存里已有文件时，Flet 和 CMake 不再下载：
 
@@ -164,7 +164,7 @@ REM scripts\build-windows-setup.cmd --rebuild
 
 1. 若缺少 `build\windows\markitdown-gui.exe`（或传入 `--rebuild`），先跑 `scripts\build-windows.cmd`（预取 GitHub 依赖 → `flet build windows`）
 2. 把官方 Pandoc 放进 `build\windows\app\bin\pandoc.exe`（缺失时下载）
-3. 用 Inno Setup 6 打出安装包
+3. 用 Inno Setup 6 打出安装包（若未安装，脚本会尝试 `winget install JRSoftware.InnoSetup`）
 
 产物：
 
